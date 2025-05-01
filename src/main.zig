@@ -1,5 +1,7 @@
 const std = @import("std");
 const sdl = @import("sdl");
+const maze = @import("maze.zig");
+const builtins = @import("builtin");
 
 pub inline fn check(val: bool, err: anytype) !void {
     if (!val) {
@@ -11,10 +13,13 @@ pub inline fn check(val: bool, err: anytype) !void {
 const Application = struct {
     window: *sdl.SDL_Window,
     renderer: *sdl.SDL_Renderer,
+
     last_count: u64,
     frequency: u64,
 
-    pub fn init() !@This() {
+    maze: maze.Maze,
+
+    pub fn init(allocator: std.mem.Allocator, seed: u64) !@This() {
         try check(sdl.SDL_Init(sdl.SDL_INIT_VIDEO), error.CouldNotInitializeSDL);
         const window = sdl.SDL_CreateWindow(
             "Daedalus",
@@ -22,15 +27,24 @@ const Application = struct {
             600,
             sdl.SDL_WINDOW_RESIZABLE | sdl.SDL_WINDOW_OPENGL,
         ) orelse try check(false, error.CouldNotCreateWindow);
+        errdefer sdl.SDL_DestroyWindow(window);
+
         const renderer = sdl.SDL_CreateRenderer(window, null) orelse {
             try check(false, error.CouldNotCreateRenderer);
         };
+        errdefer sdl.SDL_DestroyRenderer(renderer);
+
+        var m: maze.Maze = try .init(allocator, .{ .x = 10, .y = 10 }, seed);
+        errdefer m.deinit();
+
+        try m.eller();
 
         return .{
             .window = window,
             .renderer = renderer,
             .last_count = sdl.SDL_GetPerformanceCounter(),
             .frequency = sdl.SDL_GetPerformanceFrequency(),
+            .maze = m,
         };
     }
 
@@ -109,13 +123,26 @@ const Application = struct {
     }
 
     pub fn deinit(self: *@This()) void {
+        self.maze.deinit();
         sdl.SDL_DestroyRenderer(self.renderer);
         sdl.SDL_DestroyWindow(self.window);
     }
 };
 
 pub fn main() !void {
-    var app = try Application.init();
+    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+    const gpa, const is_debug = gpa: {
+        break :gpa switch (builtins.mode) {
+            .Debug, .ReleaseSafe => .{ debug_allocator.allocator(), true },
+            .ReleaseFast, .ReleaseSmall => .{ std.heap.smp_allocator, false },
+        };
+    };
+
+    defer if (is_debug) {
+        _ = debug_allocator.deinit();
+    };
+
+    var app = try Application.init(gpa, 0);
     defer app.deinit();
     try app.run();
 }
