@@ -34,7 +34,7 @@ const Application = struct {
         };
         errdefer sdl.SDL_DestroyRenderer(renderer);
 
-        var m: maze.Maze = try .init(allocator, .{ .x = 10, .y = 10 }, seed);
+        var m: maze.Maze = try .init(allocator, .{ .x = 25, .y = 25 }, seed);
         errdefer m.deinit();
 
         try m.eller();
