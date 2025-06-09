@@ -1,2 +1,17 @@
 # Daedalus
 
+## TODOs
+
+- [x] maze generator
+- [ ] Get shader working
+- [ ] Get Display map
+- [ ] Spawn energy orbs and show energy orbs
+- [ ] Show player
+- [ ] control player (only debug mode)
+- [ ] Show player energy level
+- [ ] A\* algorithm with path showing in debug mode
+- [ ] GOAP
+- [ ] Nearest corner detection from current position
+- [ ] steering system
+- [ ] camera system (zoom and drag)
+- [ ] camera follow
