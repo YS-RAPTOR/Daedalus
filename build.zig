@@ -1,6 +1,18 @@
 const std = @import("std");
 
-pub fn build(b: *std.Build) void {
+pub fn addIncludes(b: *std.Build, mod: anytype) !void {
+    var environment = try std.process.getEnvMap(b.allocator);
+    defer environment.deinit();
+
+    if (environment.get("INCLUDE")) |val| {
+        var iter = std.mem.splitAny(u8, val, ":");
+        while (iter.next()) |include_path| {
+            mod.addIncludePath(.{ .cwd_relative = include_path });
+        }
+    }
+}
+
+pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -10,19 +22,16 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const sdl_lib = b.dependency("sdl", .{
-        .target = target,
-        .optimize = optimize,
-        .lto = optimize != .Debug,
-    }).artifact("SDL3");
-
-    const sdl = b.addTranslateC(.{
+    const sdl_c = b.addTranslateC(.{
         .root_source_file = b.path("src/sdl.h"),
         .target = target,
         .optimize = optimize,
-    }).createModule();
+    });
 
-    exe_mod.linkLibrary(sdl_lib);
+    try addIncludes(b, sdl_c);
+
+    const sdl = sdl_c.createModule();
+    exe_mod.linkSystemLibrary("SDL3", .{});
     exe_mod.addImport("sdl", sdl);
 
     const exe = b.addExecutable(.{
