@@ -23,7 +23,7 @@ pub const Maze = struct {
     size: math.Vec2(usize),
     rng: random.Xoshiro256,
 
-    pub fn get_index(self: *@This(), x: usize, y: usize) usize {
+    pub fn getIndex(self: *@This(), x: usize, y: usize) usize {
         return y * self.size.x + x;
     }
 
@@ -39,7 +39,7 @@ pub const Maze = struct {
         };
     }
 
-    fn extend_down(self: *@This(), id: usize, cells: []Cell, ids: []usize) void {
+    fn extendDown(self: *@This(), id: usize, cells: []Cell, ids: []usize) void {
         const cells_to_extend = self.rng.random().uintAtMost(
             usize,
             cells.len - 1,
@@ -78,8 +78,8 @@ pub const Maze = struct {
             next_set.clearRetainingCapacity();
             next_set.appendNTimesAssumeCapacity(0, self.size.x);
 
-            const row_start = self.get_index(0, i);
-            const row_end = self.get_index(self.size.x, i);
+            const row_start = self.getIndex(0, i);
+            const row_end = self.getIndex(self.size.x, i);
             const row = self.cells.items[row_start..row_end];
 
             // Randomly join the sets
@@ -119,7 +119,7 @@ pub const Maze = struct {
                 }
 
                 id_end_index = index;
-                self.extend_down(
+                self.extendDown(
                     check_id,
                     row[id_start_index..id_end_index],
                     next_set.items[id_start_index..id_end_index],
@@ -128,7 +128,7 @@ pub const Maze = struct {
                 check_id = id;
             }
 
-            self.extend_down(
+            self.extendDown(
                 current_set.getLast(),
                 row[id_start_index..],
                 next_set.items[id_start_index..],
@@ -149,7 +149,6 @@ pub const Maze = struct {
             current_set = next_set;
             next_set = temp;
         }
-        self.print();
     }
 
     pub fn print(self: *@This()) void {
@@ -161,7 +160,7 @@ pub const Maze = struct {
         for (0..self.size.y) |row| {
             std.debug.print("\n|", .{});
             for (0..self.size.x) |col| {
-                const index = self.get_index(col, row);
+                const index = self.getIndex(col, row);
                 if (self.cells.items[index].east) {
                     std.debug.print("   |", .{});
                 } else {
@@ -170,7 +169,7 @@ pub const Maze = struct {
             }
             std.debug.print("\n+", .{});
             for (0..self.size.x) |col| {
-                const index = self.get_index(col, row);
+                const index = self.getIndex(col, row);
                 if (self.cells.items[index].south) {
                     std.debug.print("---+", .{});
                 } else {

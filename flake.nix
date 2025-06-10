@@ -9,11 +9,11 @@
       pkgs = nixpkgs.legacyPackages.${system};
     in {
       devShells.${system}.default = pkgs.mkShell {
-        nativeBuildInputs = with pkgs;
-          [
-            sdl3.dev
+        nativeBuildInputs = with pkgs; [
+          sdl3.dev
+          directx-shader-compiler
 
-          ];
+        ];
         INCLUDE = "${pkgs.sdl3.dev}/include";
       };
     };
