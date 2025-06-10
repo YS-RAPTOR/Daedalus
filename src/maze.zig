@@ -39,19 +39,6 @@ pub const Maze = struct {
         };
     }
 
-    fn run(self: *@This()) void {
-        while (true) {
-            const cells_to_extend = self.rnf.random().uintAtMost(
-                usize,
-                3,
-            ) + 1;
-            std.debug.print("Cells to extend: {}\n", .{cells_to_extend});
-            if (cells_to_extend > 1) {
-                break;
-            }
-        }
-    }
-
     fn extend_down(self: *@This(), id: usize, cells: []Cell, ids: []usize) void {
         const cells_to_extend = self.rng.random().uintAtMost(
             usize,
