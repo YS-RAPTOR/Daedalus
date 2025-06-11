@@ -16,8 +16,9 @@ cbuffer Uniforms
 
 [Flags]
 enum Cell: uint8_t {
-    south,
-    east,
+    South,
+    East,
+    Energy,
 };
 
 [[vk::binding(0, 0)]]
@@ -25,8 +26,16 @@ StructuredBuffer<Cell> maze_buffer;
 
 enum EntityType: int {
     None,
-    Player,
-    Energy,
+    Player10,
+    Player9,
+    Player8,
+    Player7,
+    Player6,
+    Player5,
+    Player4,
+    Player3,
+    Player2,
+    Player1,
 };
 
 struct Entity {
@@ -35,34 +44,41 @@ struct Entity {
     EntityType type;
 }
 
+static const float4[] entityColor = {
+    float4(0.0f, 0.0f, 0.0f, 0.0f), // None
+    float4(0.6f, 0.964f, 0.894f, 1.0f), // #99f6e4
+    float4(0.369f, 0.918f, 0.831f, 1.0f), // #5eead4
+    float4(0.176f, 0.831f, 0.749f, 1.0f), // #2dd4bf
+    float4(0.078f, 0.722f, 0.651f, 1.0f), // #14b8a6
+    float4(0.051f, 0.58f, 0.533f, 1.0f),  // #0d9488
+    float4(0.059f, 0.463f, 0.431f, 1.0f), // #0f766e
+    float4(0.067f, 0.369f, 0.349f, 1.0f), // #115e59
+    float4(0.075f, 0.306f, 0.29f, 1.0f),  // #134e4a
+    float4(0.016f, 0.184f, 0.18f, 1.0f),  // #042f2e
+};
+
 [[vk::binding(1, 0)]]
 StructuredBuffer<Entity> entities;
-
-
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
-    float2 coord = GlobalInvocationID.xy;
-    float maze_size_px = float(maze_size) * float(cell_size);
-    float2 offset_coord = coord - offset;
+    let coord: float2 = GlobalInvocationID.xy;
+    let maze_size_px = float(maze_size) * float(cell_size);
+    let offset_coord = coord - offset;
 
-    bool out_of_bounds = coord.x < offset.x || coord.y < offset.y || offset_coord.x >= maze_size_px || offset_coord.y >= maze_size_px;
+    let out_of_bounds = coord.x < offset.x || coord.y < offset.y || offset_coord.x >= maze_size_px || offset_coord.y >= maze_size_px;
 
     // NOTE: offset_coord is in the range [0, maze_size_px)
 
-    // Offset from top left
-    // Size of the board
-    // Size of the image
-    // Current Cell
+    // Draw Maze
+    let cell_index = int2(floor(offset_coord)) / cell_size;
+    let index = cell_index.y * maze_size + cell_index.x;
 
-    int2 cell_index = int2(floor(offset_coord)) / cell_size;
-    int index = cell_index.y * maze_size + cell_index.x;
-
-    bool color = false;
-    bool4 walls = getWalls(cell_index);
-    int2 cell_coord = int2(floor(offset_coord)) % cell_size;
+    var color = false;
+    let walls = getWalls(cell_index);
+    let cell_coord = int2(floor(offset_coord)) % cell_size;
 
     color |= cell_coord.y < wall_thickness && walls.x; // North wall
     color |= cell_coord.x >= cell_size - wall_thickness && walls.y; // East wall
@@ -70,6 +86,32 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     color |= cell_coord.x < wall_thickness && walls.w; // West wall
 
     OutImage[int2(coord)] = float4(float3(color), 1.0f) * float(!out_of_bounds);
+
+    // Draw Entities
+    let uv = offset_coord / maze_size_px;
+    for (uint i = 0; i < entities.getCount(); ++i) {
+        let entity = entities[i];
+        if(entity.type == EntityType::None) continue;
+        OutImage[int2(coord)] = DrawSmoothCircle(
+            uv,
+            entity.position / maze_size_px,
+            entity.radius / maze_size_px,
+            0.01f,
+            entityColor[int(entity.type)],
+            OutImage[int2(coord)],
+        );
+    }
+
+    // Draw Energy Circles
+
+}
+
+float4 DrawSmoothCircle(float2 uv, float2 center, float radius, float edgeSoftness, float4 circleColor, float4 bgColor)
+{
+    let dist = distance(uv, center);
+    let t = smoothstep(radius + edgeSoftness, radius - edgeSoftness, dist);
+    let color = lerp(bgColor, circleColor, t);
+    return color;
 }
 
 inline int getIndex(int2 cell_index) {
@@ -78,26 +120,26 @@ inline int getIndex(int2 cell_index) {
 
 // NOTE: North, East, South, West
 bool4 getWalls(int2 cell_index) {
-    bool4 result = bool4(false);
+    var result = bool4(false);
 
-    Cell cell = maze_buffer[getIndex(cell_index)];
-    result.y = (cell.bitAnd(Cell.east)) != 0; // East wall
-    result.z = (cell.bitAnd(Cell.south)) != 0; // South wall
+    let cell = maze_buffer[getIndex(cell_index)];
+    result.y = (cell.bitAnd(Cell.East)) != 0; // East wall
+    result.z = (cell.bitAnd(Cell.South)) != 0; // South wall
 
     if (cell_index.y == 0) {
         result.x = true; // North wall at the edge
     }else {
-        int2 top_cell_index = cell_index - int2(0, 1);
-        Cell top_cell = maze_buffer[getIndex(top_cell_index)];
-        result.x = (top_cell.bitAnd(Cell.south)) != 0; // North wall is the south wall of the cell above
+        let top_cell_index = cell_index - int2(0, 1);
+        let top_cell = maze_buffer[getIndex(top_cell_index)];
+        result.x = (top_cell.bitAnd(Cell.South)) != 0; // North wall is the south wall of the cell above
     }
 
     if (cell_index.x == 0) {
         result.w = true; // East wall at the edge
     } else {
-        int2 left_cell_index = cell_index - int2(1, 0);
-        Cell left_cell = maze_buffer[getIndex(left_cell_index)];
-        result.w = (left_cell.bitAnd(Cell.east)) != 0; // East wall is the east wall of the cell to the right
+        let left_cell_index = cell_index - int2(1, 0);
+        let left_cell = maze_buffer[getIndex(left_cell_index)];
+        result.w = (left_cell.bitAnd(Cell.East)) != 0; // East wall is the east wall of the cell to the right
     }
     return result;
 }

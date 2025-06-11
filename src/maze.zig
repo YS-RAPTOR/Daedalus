@@ -5,16 +5,19 @@ const random = std.Random;
 pub const Cell = packed struct(u8) {
     south: bool,
     east: bool,
-    padding: u6 = 0,
+    energy: bool,
+    padding: u5 = 0,
 
     pub const Open: @This() = .{
         .south = false,
         .east = false,
+        .energy = false,
     };
 
     pub const Walled: @This() = .{
         .south = true,
         .east = true,
+        .energy = false,
     };
 };
 

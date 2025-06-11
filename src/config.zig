@@ -11,6 +11,7 @@ const Config = struct {
     // Maze Generation
     maze_size: u32 = 100,
     seed: u64 = 0,
+    no_of_energy_cells: u32 = 25,
 
     // Render
     cell_size: u32 = 9,

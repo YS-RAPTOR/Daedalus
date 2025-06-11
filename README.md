@@ -5,6 +5,7 @@
 - [x] maze generator
 - [x] Get shader working
 - [x] Get Display map
+- [x] camera system (zoom and drag)
 - [ ] Spawn energy orbs and show energy orbs
 - [ ] Show player
 - [ ] control player (only debug mode)
@@ -14,5 +15,4 @@
 - [ ] GOAP
 - [ ] Nearest corner detection from current position
 - [ ] steering system
-- [ ] camera system (zoom and drag)
 - [ ] camera follow

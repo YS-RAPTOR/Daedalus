@@ -13,13 +13,21 @@ pub inline fn check(val: bool, err: anytype) !void {
     }
 }
 
-pub const Entity = struct {
+pub const Entity = extern struct {
     position: math.Vec2(f32) = .Zero,
     radius: f32 = 0,
     entiy_type: enum(u32) {
         None,
-        Player,
-        Energy,
+        Player10,
+        Player9,
+        Player8,
+        Player7,
+        Player6,
+        Player5,
+        Player4,
+        Player3,
+        Player2,
+        Player1,
     } = .None,
 };
 
@@ -55,6 +63,19 @@ pub const Application = struct {
 
     game_data: struct {
         cell_size: f32,
+        player: struct {
+            position: math.Vec2(f32),
+            velocity: math.Vec2(f32) = .Zero,
+            acceleration: math.Vec2(f32) = .Zero,
+            mass: f32 = 1.0,
+            friction: f32 = 0.01,
+        },
+        follow_player: bool = true,
+        drag: struct {
+            is_holding_mouse: bool = false,
+            held_mouse_position: math.Vec2(f32) = .Zero,
+            held_offset: math.Vec2(f32) = .Zero,
+        } = .{},
     },
 
     pub fn init(allocator: std.mem.Allocator) !@This() {
@@ -161,7 +182,19 @@ pub const Application = struct {
         // Initialize Game Data
         self.game_data = .{
             .cell_size = @floatFromInt(config.cell_size),
+            .player = .{
+                // TODO: Player Position should be random
+                .position = .Zero,
+            },
         };
+
+        for (0..config.max_entities) |i| {
+            self.entities[i] = .{
+                .position = math.Vec2(f32).Zero,
+                .radius = 0.0,
+                .entiy_type = .None,
+            };
+        }
 
         return self;
     }
@@ -208,6 +241,32 @@ pub const Application = struct {
                             },
                         }
                     },
+                    sdl.SDL_EVENT_MOUSE_BUTTON_DOWN => {
+                        // check if the mouse button 1 is pressed
+                        if (event.button.button == sdl.SDL_BUTTON_LEFT) {
+                            self.handleMouseDrag(true, event.button.x, event.button.y);
+                        }
+                    },
+                    sdl.SDL_EVENT_MOUSE_BUTTON_UP => {
+                        // check if the mouse button 1 is released
+                        if (event.button.button == sdl.SDL_BUTTON_LEFT) {
+                            self.handleMouseDrag(false, event.button.x, event.button.y);
+                        }
+                    },
+                    sdl.SDL_EVENT_MOUSE_MOTION => {
+                        // Update held mouse position if dragging
+                        if (self.game_data.drag.is_holding_mouse) {
+                            self.handleMouseDrag(true, event.motion.x, event.motion.y);
+                        }
+                    },
+                    sdl.SDL_EVENT_MOUSE_WHEEL => {
+                        // Check if the mouse wheel is scrolled up or down
+                        if (event.wheel.y > 0) {
+                            self.handleMouseScroll(true);
+                        } else if (event.wheel.y < 0) {
+                            self.handleMouseScroll(false);
+                        }
+                    },
                     else => {},
                 }
             }
@@ -219,23 +278,57 @@ pub const Application = struct {
 
     fn handleKeyboardInput(self: *@This(), keycode: u32) void {
         switch (keycode) {
-            sdl.SDLK_UP, sdl.SDLK_W => {
-                self.uniforms.offset.y -= 10;
-            },
-            sdl.SDLK_DOWN, sdl.SDLK_S => {
-                self.uniforms.offset.y += 10;
-            },
-            sdl.SDLK_LEFT, sdl.SDLK_A => {
-                self.uniforms.offset.x -= 10;
-            },
-            sdl.SDLK_RIGHT, sdl.SDLK_D => {
-                self.uniforms.offset.x += 10;
+            sdl.SDLK_SPACE => {
+                self.game_data.follow_player = true;
             },
             else => {},
         }
     }
-    fn handleMouseInput(self: *@This()) void {
-        _ = self;
+    fn handleMouseDrag(self: *@This(), is_down: bool, x: f32, y: f32) void {
+        if (is_down and !self.game_data.drag.is_holding_mouse) {
+            self.game_data.drag.is_holding_mouse = true;
+            self.game_data.drag.held_mouse_position = .init(x, y);
+            self.game_data.drag.held_offset = self.uniforms.offset;
+            self.game_data.follow_player = false;
+        } else if (is_down) {
+            // Update held mouse position
+            const current_mouse_position: math.Vec2(f32) = .init(x, y);
+            const offset = current_mouse_position.subtract(self.game_data.drag.held_mouse_position);
+            self.uniforms.offset = self.game_data.drag.held_offset.add(offset);
+        } else {
+            self.game_data.drag.is_holding_mouse = false;
+        }
+    }
+
+    fn handleMouseScroll(self: *@This(), is_up: bool) void {
+        // Either scroll towards player or cursor
+        const towards = blk: {
+            if (self.game_data.follow_player) {
+                break :blk self.game_data.player.position;
+            } else {
+                var x: f32 = 0;
+                var y: f32 = 0;
+                _ = sdl.SDL_GetMouseState(&x, &y);
+
+                break :blk math.Vec2(f32).init(x, y);
+            }
+        };
+
+        if (self.uniforms.cell_size == config.min_cell_size and !is_up) {
+            return; // Do not zoom out if already at minimum size
+        } else if (self.uniforms.cell_size == config.max_cell_size and is_up) {
+            return; // Do not zoom in if already at maximum size
+        }
+
+        const old_cell_size = self.game_data.cell_size;
+        if (is_up) {
+            self.game_data.cell_size *= 1.1;
+        } else {
+            self.game_data.cell_size *= 0.9;
+        }
+        const scale_factor = self.game_data.cell_size / old_cell_size;
+        self.uniforms.offset.x = towards.x + (self.uniforms.offset.x - towards.x) * scale_factor;
+        self.uniforms.offset.y = towards.y + (self.uniforms.offset.y - towards.y) * scale_factor;
     }
 
     fn update(self: *@This(), delta_time: f32) void {
@@ -256,6 +349,9 @@ pub const Application = struct {
             @round(self.game_data.cell_size * config.energy_radius_percentage),
         );
         self.uniforms.cell_size = @intFromFloat(self.game_data.cell_size);
+
+        // TODO:Set the offset so that the player is always in the center of the screen
+        if (self.game_data.follow_player) {}
     }
 
     fn render(self: *@This()) !void {
