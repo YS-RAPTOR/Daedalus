@@ -1,46 +1,23 @@
-struct VxInput
+[[vk::binding(0, 1)]]
+[[vk::image_format("rgba8")]]
+RWTexture2D<float4> OutImage;
+
+[[vk::binding(0, 2)]]
+cbuffer UBO : register(b0, space2)
 {
-    uint VertexIndex : SV_VertexID;
+    float ubo_time;
 };
 
-struct VxOutput
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
-    float4 Color : TEXCOORD0;
-    float4 Position : SV_Position;
-};
+    float w, h;
+    OutImage.GetDimensions(w, h);
+    float2 size = float2(w, h);
+    float2 coord = GlobalInvocationID.xy;
+    float2 uv = coord / size;
 
-
-[shader("vertex")]
-VxOutput vx(VxInput input) {
-    VxOutput output;
-    float2 pos;
-    if (input.VertexIndex == 0)
-    {
-        pos = (-1.0f).xx;
-        output.Color = float4(1.0f, 0.0f, 0.0f, 1.0f);
-    }
-    else
-    {
-        if (input.VertexIndex == 1)
-        {
-            pos = float2(1.0f, -1.0f);
-            output.Color = float4(0.0f, 1.0f, 0.0f, 1.0f);
-        }
-        else
-        {
-            if (input.VertexIndex == 2)
-            {
-                pos = float2(0.0f, 1.0f);
-                output.Color = float4(0.0f, 0.0f, 1.0f, 1.0f);
-            }
-        }
-    }
-    output.Position = float4(pos, 0.0f, 1.0f);
-    return output;
-}
-
-[shader("pixel")]
-float4 px(float4 Color: TEXCOORD0) : SV_Target0
-{
-    return Color;
+    float3 col = 0.5f.xxx + (cos((ubo_time.xxx + uv.xyx) + float3(0.0f, 2.0f, 4.0f)) * 0.5f);
+    OutImage[int2(coord)] = float4(col, 1.0f);
 }

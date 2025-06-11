@@ -13,25 +13,16 @@ pub fn addIncludes(b: *std.Build, mod: anytype) !void {
 }
 
 pub fn compileShaders(b: *std.Build, src: std.Build.LazyPath, comptime name: []const u8, mod: *std.Build.Module) void {
-    const vertex_command = b.addSystemCommand(&.{"slangc"});
-    vertex_command.addFileArg(src);
-    vertex_command.addArgs(&.{
+    const compute_command = b.addSystemCommand(&.{"slangc"});
+    compute_command.addFileArg(src);
+    compute_command.addArgs(&.{
         "-target", "spirv",
-        "-entry",  "vx",
+        "-entry",  "main",
     });
-    const vertex = vertex_command.captureStdOut();
-
-    const fragment_command = b.addSystemCommand(&.{"slangc"});
-    fragment_command.addFileArg(src);
-    fragment_command.addArgs(&.{
-        "-target", "spirv",
-        "-entry",  "px",
-    });
-    const fragment = fragment_command.captureStdOut();
+    const compute = compute_command.captureStdOut();
 
     const shader_command = b.addSystemCommand(&.{"./shaders/convert.sh"});
-    shader_command.addFileArg(vertex);
-    shader_command.addFileArg(fragment);
+    shader_command.addFileArg(compute);
     const shader = shader_command.addOutputFileArg(name ++ ".zig");
 
     const shader_mod = b.addModule(name, .{

@@ -14,10 +14,14 @@ pub const Application = struct {
     allocator: std.mem.Allocator,
     window: *sdl.SDL_Window,
     device: *sdl.SDL_GPUDevice,
-    color_targets: [1]sdl.SDL_GPUColorTargetInfo,
-    pipeline: *sdl.SDL_GPUGraphicsPipeline,
     last_count: u64,
     frequency: u64,
+
+    pipeline: *sdl.SDL_GPUComputePipeline,
+    texture: *sdl.SDL_GPUTexture,
+    uniforms: struct {
+        time: f32,
+    },
 
     pub fn init(allocator: std.mem.Allocator) !@This() {
         // Initialize SDL
@@ -29,9 +33,9 @@ pub const Application = struct {
         // Create a window
         self.window = sdl.SDL_CreateWindow(
             config.name.ptr,
-            config.staring_window_width,
-            config.staring_window_height,
-            sdl.SDL_WINDOW_RESIZABLE | sdl.SDL_WINDOW_HIDDEN,
+            config.window_width,
+            config.window_height,
+            sdl.SDL_WINDOW_HIDDEN,
         ) orelse try check(false, error.CouldNotCreateWindow);
         errdefer sdl.SDL_DestroyWindow(self.window);
 
@@ -52,31 +56,34 @@ pub const Application = struct {
         // Show the window
         try check(sdl.SDL_ShowWindow(self.window), error.CouldNotShowWindow);
 
-        // Color Targets
-        self.color_targets = [1]sdl.SDL_GPUColorTargetInfo{
-            .{
-                .clear_color = .{
-                    .r = config.clear_color[0],
-                    .g = config.clear_color[1],
-                    .b = config.clear_color[2],
-                    .a = config.clear_color[3],
-                },
-                .load_op = sdl.SDL_GPU_LOADOP_CLEAR,
-                .store_op = sdl.SDL_GPU_STOREOP_STORE,
-            },
-        };
-
-        // Create Pipeline
-        self.pipeline = try self.createPipeline();
-        errdefer sdl.SDL_ReleaseGPUGraphicsPipeline(self.device, self.pipeline);
-
         self.last_count = sdl.SDL_GetPerformanceCounter();
         self.frequency = sdl.SDL_GetPerformanceFrequency();
+
+        self.pipeline = try self.createPipeline();
+        errdefer sdl.SDL_ReleaseGPUComputePipeline(self.device, self.pipeline);
+
+        self.texture = sdl.SDL_CreateGPUTexture(
+            self.device,
+            &.{
+                .format = sdl.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+                .type = sdl.SDL_GPU_TEXTURETYPE_2D,
+                .width = config.window_width,
+                .height = config.window_height,
+                .layer_count_or_depth = 1,
+                .num_levels = 1,
+                .usage = sdl.SDL_GPU_TEXTUREUSAGE_SAMPLER | sdl.SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
+            },
+        ) orelse try check(false, error.CouldNotCreateTexture);
+        errdefer sdl.SDL_ReleaseGPUTexture(self.device, self.texture);
+
+        self.uniforms = .{ .time = 0.0 };
+
         return self;
     }
 
     pub fn deinit(self: *@This()) void {
-        sdl.SDL_ReleaseGPUGraphicsPipeline(self.device, self.pipeline);
+        sdl.SDL_ReleaseGPUTexture(self.device, self.texture);
+        sdl.SDL_ReleaseGPUComputePipeline(self.device, self.pipeline);
         sdl.SDL_DestroyGPUDevice(self.device);
         sdl.SDL_DestroyWindow(self.window);
         sdl.SDL_Quit();
@@ -126,8 +133,7 @@ pub const Application = struct {
     }
 
     fn update(self: *@This(), delta_time: f32) void {
-        _ = self;
-        _ = delta_time;
+        self.uniforms.time += delta_time;
     }
 
     fn render(self: *@This()) !void {
@@ -146,92 +152,64 @@ pub const Application = struct {
         errdefer sdl.SDL_ReleaseGPUTexture(self.device, texture);
 
         if (texture) |tex| {
-            self.color_targets[0].texture = tex;
-            const render_pass = sdl.SDL_BeginGPURenderPass(
-                command_buffer,
-                @ptrCast(&self.color_targets),
-                self.color_targets.len,
-                null,
-            ) orelse try check(false, error.CouldNotBeginRenderPass);
-            defer sdl.SDL_EndGPURenderPass(render_pass);
-            sdl.SDL_BindGPUGraphicsPipeline(render_pass, self.pipeline);
-            sdl.SDL_DrawGPUPrimitives(
-                render_pass,
-                3,
-                1,
-                0,
-                0,
-            );
+            {
+                const texture_bindings = [_]sdl.SDL_GPUStorageTextureReadWriteBinding{
+                    .{
+                        .texture = self.texture,
+                        .cycle = true,
+                    },
+                };
+
+                const compute_pass = sdl.SDL_BeginGPUComputePass(
+                    command_buffer,
+                    &texture_bindings,
+                    texture_bindings.len,
+                    null,
+                    0,
+                ) orelse try check(false, error.CouldNotBeginComputePass);
+                defer sdl.SDL_EndGPUComputePass(compute_pass);
+
+                sdl.SDL_BindGPUComputePipeline(compute_pass, self.pipeline);
+                sdl.SDL_PushGPUComputeUniformData(
+                    command_buffer,
+                    0,
+                    &self.uniforms,
+                    @sizeOf(@TypeOf(self.uniforms)),
+                );
+                sdl.SDL_DispatchGPUCompute(
+                    compute_pass,
+                    config.window_width / 8,
+                    config.window_height / 8,
+                    1,
+                );
+            }
+
+            sdl.SDL_BlitGPUTexture(command_buffer, &.{
+                .source = .{
+                    .texture = self.texture,
+                    .w = config.window_width,
+                    .h = config.window_height,
+                },
+                .destination = .{
+                    .texture = tex,
+                    .w = config.window_width,
+                    .h = config.window_height,
+                },
+                .load_op = sdl.SDL_GPU_LOADOP_DONT_CARE,
+                .filter = sdl.SDL_GPU_FILTER_NEAREST,
+            });
         }
         try check(sdl.SDL_SubmitGPUCommandBuffer(command_buffer), error.CouldNotSubmitCommandBuffer);
     }
 
-    fn createPipeline(self: *@This()) !*sdl.SDL_GPUGraphicsPipeline {
-        const vertex = try self.loadShader(
-            .vertex,
-            shader.vertex,
-            0,
-            0,
-            0,
-            0,
-        );
-        defer sdl.SDL_ReleaseGPUShader(self.device, vertex);
-
-        const fragment = try self.loadShader(
-            .fragment,
-            shader.fragment,
-            0,
-            0,
-            0,
-            0,
-        );
-        defer sdl.SDL_ReleaseGPUShader(self.device, fragment);
-
-        const target_info: sdl.SDL_GPUGraphicsPipelineTargetInfo = .{
-            .num_color_targets = self.color_targets.len,
-            .color_target_descriptions = &[self.color_targets.len]sdl.SDL_GPUColorTargetDescription{
-                .{
-                    .format = sdl.SDL_GetGPUSwapchainTextureFormat(
-                        self.device,
-                        self.window,
-                    ),
-                },
-            },
-        };
-        const pipeline_create_info: sdl.SDL_GPUGraphicsPipelineCreateInfo = .{
-            .vertex_shader = vertex,
-            .fragment_shader = fragment,
-            .primitive_type = sdl.SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
-            .target_info = target_info,
-            .rasterizer_state = .{
-                .fill_mode = sdl.SDL_GPU_FILLMODE_FILL,
-            },
-        };
-        return sdl.SDL_CreateGPUGraphicsPipeline(
-            self.device,
-            &pipeline_create_info,
-        ) orelse try check(false, error.CouldNotCreateGraphicsPipeline);
-    }
-
-    fn loadShader(
-        self: *@This(),
-        stage: enum(c_uint) {
-            vertex = sdl.SDL_GPU_SHADERSTAGE_VERTEX,
-            fragment = sdl.SDL_GPU_SHADERSTAGE_FRAGMENT,
-        },
-        file: []const u8,
-        sampler_count: u32,
-        uniform_buffer_count: u32,
-        storage_buffer_count: u32,
-        storage_texture_count: u32,
-    ) !*sdl.SDL_GPUShader {
+    fn createPipeline(self: *@This()) !*sdl.SDL_GPUComputePipeline {
         const format = sdl.SDL_GPU_SHADERFORMAT_SPIRV;
         const backend_formats = sdl.SDL_GetGPUShaderFormats(self.device);
         if ((backend_formats & format) == 0) {
             return error.NoSupportedShaderFormat;
         }
         const entrypoint = "main";
-        const shader_file = try std.fs.openFileAbsolute(file, .{ .mode = .read_only });
+        const shader_file = try std.fs.openFileAbsolute(shader.compute, .{ .mode = .read_only });
         defer shader_file.close();
 
         const shader_size = try shader_file.getEndPos();
@@ -244,19 +222,21 @@ pub const Application = struct {
         );
         defer self.allocator.free(shader_content);
 
-        const shader_info: sdl.SDL_GPUShaderCreateInfo = .{
+        const pipeline_info: sdl.SDL_GPUComputePipelineCreateInfo = .{
             .code = shader_content.ptr,
             .code_size = shader_content.len,
             .entrypoint = entrypoint,
             .format = format,
-            .stage = @intFromEnum(stage),
-            .num_samplers = sampler_count,
-            .num_uniform_buffers = uniform_buffer_count,
-            .num_storage_buffers = storage_buffer_count,
-            .num_storage_textures = storage_texture_count,
+
+            .num_readwrite_storage_textures = 1,
+            .num_uniform_buffers = 1,
+            .threadcount_x = 8,
+            .threadcount_y = 8,
+            .threadcount_z = 1,
         };
 
-        const gpuShader = sdl.SDL_CreateGPUShader(self.device, &shader_info);
-        return gpuShader orelse try check(false, error.CouldNotCreateShader);
+        return sdl.SDL_CreateGPUComputePipeline(self.device, &pipeline_info) orelse {
+            try check(false, error.CouldNotCreateComputePipeline);
+        };
     }
 };
