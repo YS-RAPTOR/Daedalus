@@ -109,29 +109,55 @@ pub fn main() !void {
         },
     };
 
-    const vertex = try loadShader(
-        debug_allocator.allocator(),
-        device,
-        .vertex,
-        shader.vertex,
-        0,
-        0,
-        0,
-        0,
-    );
-    errdefer sdl.SDL_ReleaseGPUShader(device, vertex);
+    const pipeline = blk: {
+        const vertex = try loadShader(
+            debug_allocator.allocator(),
+            device,
+            .vertex,
+            shader.vertex,
+            0,
+            0,
+            0,
+            0,
+        );
+        defer sdl.SDL_ReleaseGPUShader(device, vertex);
 
-    const fragment = try loadShader(
-        debug_allocator.allocator(),
-        device,
-        .fragment,
-        shader.fragment,
-        0,
-        0,
-        0,
-        0,
-    );
-    errdefer sdl.SDL_ReleaseGPUShader(device, fragment);
+        const fragment = try loadShader(
+            debug_allocator.allocator(),
+            device,
+            .fragment,
+            shader.fragment,
+            0,
+            0,
+            0,
+            0,
+        );
+        defer sdl.SDL_ReleaseGPUShader(device, fragment);
+
+        const pipeline_create_info: sdl.SDL_GPUGraphicsPipelineCreateInfo = .{
+            .vertex_shader = vertex,
+            .fragment_shader = fragment,
+            .primitive_type = sdl.SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
+            .target_info = .{
+                .num_color_targets = color_targets.len,
+                .color_target_descriptions = &[color_targets.len]sdl.SDL_GPUColorTargetDescription{
+                    .{
+                        .format = sdl.SDL_GetGPUSwapchainTextureFormat(
+                            device,
+                            window,
+                        ),
+                    },
+                },
+            },
+            .rasterizer_state = .{
+                .fill_mode = sdl.SDL_GPU_FILLMODE_FILL,
+            },
+        };
+        break :blk sdl.SDL_CreateGPUGraphicsPipeline(
+            device,
+            &pipeline_create_info,
+        ) orelse try check(false, error.CouldNotCreateGraphicsPipeline);
+    };
 
     var event: sdl.SDL_Event = undefined;
     main_loop: while (true) {
@@ -165,6 +191,14 @@ pub fn main() !void {
                 null,
             ) orelse try check(false, error.CouldNotBeginRenderPass);
             defer sdl.SDL_EndGPURenderPass(render_pass);
+            sdl.SDL_BindGPUGraphicsPipeline(render_pass, pipeline);
+            sdl.SDL_DrawGPUPrimitives(
+                render_pass,
+                3,
+                1,
+                0,
+                0,
+            );
         }
         try check(sdl.SDL_SubmitGPUCommandBuffer(command_buffer), error.CouldNotSubmitCommandBuffer);
     }
