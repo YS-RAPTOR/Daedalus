@@ -12,6 +12,34 @@ pub fn addIncludes(b: *std.Build, mod: anytype) !void {
     }
 }
 
+pub fn compileShaders(b: *std.Build, src: std.Build.LazyPath, comptime name: []const u8, mod: *std.Build.Module) void {
+    const vertex_command = b.addSystemCommand(&.{"slangc"});
+    vertex_command.addFileArg(src);
+    vertex_command.addArgs(&.{
+        "-target", "spirv",
+        "-entry",  "vx",
+    });
+    const vertex = vertex_command.captureStdOut();
+
+    const fragment_command = b.addSystemCommand(&.{"slangc"});
+    fragment_command.addFileArg(src);
+    fragment_command.addArgs(&.{
+        "-target", "spirv",
+        "-entry",  "px",
+    });
+    const fragment = fragment_command.captureStdOut();
+
+    const shader_command = b.addSystemCommand(&.{"./shaders/convert.sh"});
+    shader_command.addFileArg(vertex);
+    shader_command.addFileArg(fragment);
+    const shader = shader_command.addOutputFileArg(name ++ ".zig");
+
+    const shader_mod = b.addModule(name, .{
+        .root_source_file = shader,
+    });
+    mod.addImport(name, shader_mod);
+}
+
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -29,6 +57,7 @@ pub fn build(b: *std.Build) !void {
     });
 
     try addIncludes(b, sdl_c);
+    compileShaders(b, b.path("shaders/main.slang"), "shader", exe_mod);
 
     const sdl = sdl_c.createModule();
     exe_mod.linkSystemLibrary("SDL3", .{});

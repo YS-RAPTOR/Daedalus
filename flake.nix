@@ -10,8 +10,8 @@
     in {
       devShells.${system}.default = pkgs.mkShell {
         nativeBuildInputs = with pkgs; [
+          shader-slang
           sdl3.dev
-          directx-shader-compiler
 
         ];
         INCLUDE = "${pkgs.sdl3.dev}/include";

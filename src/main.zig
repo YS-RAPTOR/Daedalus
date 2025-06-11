@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtins = @import("builtin");
 const sdl = @import("sdl");
+const shader = @import("shader");
 
 pub inline fn check(val: bool, err: anytype) !void {
     if (!val) {
