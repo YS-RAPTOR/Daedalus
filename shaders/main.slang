@@ -46,6 +46,7 @@ struct Entity {
 
 static const float4[] entityColor = {
     float4(0.0f, 0.0f, 0.0f, 0.0f), // None
+    float4(0.8, 0.984, 0.945, 1.0), //#ccfbf1
     float4(0.6f, 0.964f, 0.894f, 1.0f), // #99f6e4
     float4(0.369f, 0.918f, 0.831f, 1.0f), // #5eead4
     float4(0.176f, 0.831f, 0.749f, 1.0f), // #2dd4bf

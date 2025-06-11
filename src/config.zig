@@ -25,6 +25,7 @@ const Config = struct {
     // Player
     mass: f32 = 1.0,
     friction: f32 = 0.15,
+    energy_multiplier: f32 = 0.01,
 };
 
 pub const config: Config = .{};

@@ -69,7 +69,7 @@ pub const Application = struct {
             velocity: math.Vec2(f32) = .Zero,
             acceleration: math.Vec2(f32) = .Zero,
             force: math.Vec2(f32) = .Zero,
-            energy_level: u8 = 100,
+            energy_level: f32 = 100,
         } = .{},
         drag: struct {
             is_holding_mouse: bool = false,
@@ -351,6 +351,7 @@ pub const Application = struct {
         );
         self.uniforms.cell_size = @intFromFloat(self.game_data.cell_size);
 
+        // Update Player Position and Velocity
         if (self.game_data.player.velocity.length() > 0) {
             var friction_force = self.game_data.player.velocity.normalize();
             friction_force = friction_force.multiply(-config.friction);
@@ -366,6 +367,10 @@ pub const Application = struct {
         self.game_data.player.force = .Zero;
 
         const player_radius: f32 = self.game_data.cell_size * config.player_radius_percentage;
+
+        // Update Player Energy Level
+        const energy_consumed = self.game_data.player.velocity.trueLength() * config.energy_multiplier;
+        self.game_data.player.energy_level -= energy_consumed;
 
         // Player
         self.entities[0] = .{
