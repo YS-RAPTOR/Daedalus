@@ -10,6 +10,54 @@ pub inline fn check(val: bool, err: anytype) !void {
     }
 }
 
+pub fn loadShader(
+    allocator: std.mem.Allocator,
+    device: *sdl.SDL_GPUDevice,
+    stage: enum(c_uint) {
+        vertex = sdl.SDL_GPU_SHADERSTAGE_VERTEX,
+        fragment = sdl.SDL_GPU_SHADERSTAGE_FRAGMENT,
+    },
+    file: []const u8,
+    sampler_count: u32,
+    uniform_buffer_count: u32,
+    storage_buffer_count: u32,
+    storage_texture_count: u32,
+) !*sdl.SDL_GPUShader {
+    const format = sdl.SDL_GPU_SHADERFORMAT_SPIRV;
+    const backend_formats = sdl.SDL_GetGPUShaderFormats(device);
+    if ((backend_formats & format) == 0) {
+        return error.NoSupportedShaderFormat;
+    }
+    const entrypoint = "main";
+    const shader_file = try std.fs.openFileAbsolute(file, .{ .mode = .read_only });
+    defer shader_file.close();
+
+    const shader_size = try shader_file.getEndPos();
+    const shader_content = try shader_file.readToEndAllocOptions(
+        allocator,
+        shader_size,
+        shader_size,
+        @alignOf(u8),
+        null,
+    );
+    defer allocator.free(shader_content);
+
+    const shader_info: sdl.SDL_GPUShaderCreateInfo = .{
+        .code = shader_content.ptr,
+        .code_size = shader_content.len,
+        .entrypoint = entrypoint,
+        .format = format,
+        .stage = @intFromEnum(stage),
+        .num_samplers = sampler_count,
+        .num_uniform_buffers = uniform_buffer_count,
+        .num_storage_buffers = storage_buffer_count,
+        .num_storage_textures = storage_texture_count,
+    };
+
+    const gpuShader = sdl.SDL_CreateGPUShader(device, &shader_info);
+    return gpuShader orelse try check(false, error.CouldNotCreateShader);
+}
+
 pub fn main() !void {
     // Initialize allocator
     var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
@@ -60,6 +108,30 @@ pub fn main() !void {
             .store_op = sdl.SDL_GPU_STOREOP_STORE,
         },
     };
+
+    const vertex = try loadShader(
+        debug_allocator.allocator(),
+        device,
+        .vertex,
+        shader.vertex,
+        0,
+        0,
+        0,
+        0,
+    );
+    errdefer sdl.SDL_ReleaseGPUShader(device, vertex);
+
+    const fragment = try loadShader(
+        debug_allocator.allocator(),
+        device,
+        .fragment,
+        shader.fragment,
+        0,
+        0,
+        0,
+        0,
+    );
+    errdefer sdl.SDL_ReleaseGPUShader(device, fragment);
 
     var event: sdl.SDL_Event = undefined;
     main_loop: while (true) {
