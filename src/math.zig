@@ -97,7 +97,7 @@ pub fn Vec2(T: type) type {
         pub inline fn normalize(self: @This()) Vec2(float_type) {
             const len = self.trueLength();
             if (len == 0) {
-                return Vec2.Zero;
+                return .Zero;
             }
             return self.divide(len);
         }

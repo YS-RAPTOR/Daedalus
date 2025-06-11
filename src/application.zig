@@ -28,6 +28,7 @@ pub const Entity = extern struct {
         Player3,
         Player2,
         Player1,
+        Target,
     } = .None,
 };
 
@@ -54,7 +55,6 @@ pub const Application = struct {
         maze_size: u32,
         cell_size: u32,
         wall_thickness: u32 = 0,
-        player_radius: u32 = 0,
         energy_radius: u32 = 0,
     },
 
@@ -63,14 +63,14 @@ pub const Application = struct {
 
     game_data: struct {
         cell_size: f32,
+        target: math.Vec2(f32),
         player: struct {
-            position: math.Vec2(f32),
+            position: math.Vec2(f32) = .init(0.5, 0.5),
             velocity: math.Vec2(f32) = .Zero,
             acceleration: math.Vec2(f32) = .Zero,
-            mass: f32 = 1.0,
-            friction: f32 = 0.01,
-        },
-        follow_player: bool = true,
+            force: math.Vec2(f32) = .Zero,
+            energy_level: u8 = 100,
+        } = .{},
         drag: struct {
             is_holding_mouse: bool = false,
             held_mouse_position: math.Vec2(f32) = .Zero,
@@ -182,11 +182,11 @@ pub const Application = struct {
         // Initialize Game Data
         self.game_data = .{
             .cell_size = @floatFromInt(config.cell_size),
-            .player = .{
-                // TODO: Player Position should be random
-                .position = .Zero,
-            },
+            .target = .init(-0.5, -0.5),
         };
+
+        const maze_float: f32 = @floatFromInt(config.maze_size);
+        self.game_data.target = self.game_data.target.add(.init(maze_float, maze_float));
 
         for (0..config.max_entities) |i| {
             self.entities[i] = .{
@@ -278,8 +278,17 @@ pub const Application = struct {
 
     fn handleKeyboardInput(self: *@This(), keycode: u32) void {
         switch (keycode) {
-            sdl.SDLK_SPACE => {
-                self.game_data.follow_player = true;
+            sdl.SDLK_W, sdl.SDLK_UP => {
+                self.game_data.player.force.y = -1.0;
+            },
+            sdl.SDLK_S, sdl.SDLK_DOWN => {
+                self.game_data.player.force.y = 1.0;
+            },
+            sdl.SDLK_A, sdl.SDLK_LEFT => {
+                self.game_data.player.force.x = -1.0;
+            },
+            sdl.SDLK_D, sdl.SDLK_RIGHT => {
+                self.game_data.player.force.x = 1.0;
             },
             else => {},
         }
@@ -289,7 +298,6 @@ pub const Application = struct {
             self.game_data.drag.is_holding_mouse = true;
             self.game_data.drag.held_mouse_position = .init(x, y);
             self.game_data.drag.held_offset = self.uniforms.offset;
-            self.game_data.follow_player = false;
         } else if (is_down) {
             // Update held mouse position
             const current_mouse_position: math.Vec2(f32) = .init(x, y);
@@ -303,15 +311,11 @@ pub const Application = struct {
     fn handleMouseScroll(self: *@This(), is_up: bool) void {
         // Either scroll towards player or cursor
         const towards = blk: {
-            if (self.game_data.follow_player) {
-                break :blk self.game_data.player.position;
-            } else {
-                var x: f32 = 0;
-                var y: f32 = 0;
-                _ = sdl.SDL_GetMouseState(&x, &y);
+            var x: f32 = 0;
+            var y: f32 = 0;
+            _ = sdl.SDL_GetMouseState(&x, &y);
 
-                break :blk math.Vec2(f32).init(x, y);
-            }
+            break :blk math.Vec2(f32).init(x, y);
         };
 
         if (self.uniforms.cell_size == config.min_cell_size and !is_up) {
@@ -342,16 +346,62 @@ pub const Application = struct {
         self.uniforms.wall_thickness = @intFromFloat(
             @round(self.game_data.cell_size * config.wall_thickness_percentage),
         );
-        self.uniforms.player_radius = @intFromFloat(
-            @round(self.game_data.cell_size * config.player_radius_percentage),
-        );
         self.uniforms.energy_radius = @intFromFloat(
             @round(self.game_data.cell_size * config.energy_radius_percentage),
         );
         self.uniforms.cell_size = @intFromFloat(self.game_data.cell_size);
 
-        // TODO:Set the offset so that the player is always in the center of the screen
-        if (self.game_data.follow_player) {}
+        if (self.game_data.player.velocity.length() > 0) {
+            var friction_force = self.game_data.player.velocity.normalize();
+            friction_force = friction_force.multiply(-config.friction);
+            self.game_data.player.force = self.game_data.player.force.add(friction_force);
+        }
+        self.game_data.player.acceleration = self.game_data.player.force.divide(config.mass);
+        self.game_data.player.velocity = self.game_data.player.velocity.add(
+            self.game_data.player.acceleration.multiply(delta_time),
+        );
+        self.game_data.player.position = self.game_data.player.position.add(
+            self.game_data.player.velocity.multiply(delta_time),
+        );
+        self.game_data.player.force = .Zero;
+
+        const player_radius: f32 = self.game_data.cell_size * config.player_radius_percentage;
+
+        // Player
+        self.entities[0] = .{
+            .position = self.game_data.player.position,
+            .radius = player_radius,
+            .entiy_type = blk: {
+                if (self.game_data.player.energy_level > 90) {
+                    break :blk .Player10;
+                } else if (self.game_data.player.energy_level > 80) {
+                    break :blk .Player9;
+                } else if (self.game_data.player.energy_level > 70) {
+                    break :blk .Player8;
+                } else if (self.game_data.player.energy_level > 60) {
+                    break :blk .Player7;
+                } else if (self.game_data.player.energy_level > 50) {
+                    break :blk .Player6;
+                } else if (self.game_data.player.energy_level > 40) {
+                    break :blk .Player5;
+                } else if (self.game_data.player.energy_level > 30) {
+                    break :blk .Player4;
+                } else if (self.game_data.player.energy_level > 20) {
+                    break :blk .Player3;
+                } else if (self.game_data.player.energy_level > 10) {
+                    break :blk .Player2;
+                } else {
+                    break :blk .Player1;
+                }
+            },
+        };
+
+        // Target
+        self.entities[1] = .{
+            .position = self.game_data.target,
+            .radius = player_radius,
+            .entiy_type = .Target,
+        };
     }
 
     fn render(self: *@This()) !void {

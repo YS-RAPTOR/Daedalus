@@ -42,6 +42,15 @@ pub const Maze = struct {
         };
     }
 
+    pub fn initLocations(self: *@This(), min_cells: usize, max_cells: usize) void {
+        const no_of_cells = self.rng.random().intRangeAtMost(u8, min_cells, max_cells);
+
+        for (0..no_of_cells) |_| {
+            const random_index = self.rng.random().uintLessThan(usize, self.size.x * self.size.y);
+            self.cells.items[random_index].energy = true;
+        }
+    }
+
     fn extendDown(self: *@This(), id: usize, cells: []Cell, ids: []usize) void {
         const cells_to_extend = self.rng.random().uintAtMost(
             usize,

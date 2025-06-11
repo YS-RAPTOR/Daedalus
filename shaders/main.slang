@@ -10,7 +10,6 @@ cbuffer Uniforms
     uint maze_size;
     uint cell_size;
     uint wall_thickness;
-    uint player_radius;
     uint energy_radius;
 };
 
@@ -36,6 +35,7 @@ enum EntityType: int {
     Player3,
     Player2,
     Player1,
+    Target,
 };
 
 struct Entity {
@@ -55,6 +55,7 @@ static const float4[] entityColor = {
     float4(0.067f, 0.369f, 0.349f, 1.0f), // #115e59
     float4(0.075f, 0.306f, 0.29f, 1.0f),  // #134e4a
     float4(0.016f, 0.184f, 0.18f, 1.0f),  // #042f2e
+    float4(0.882, 0.114, 0.282, 1.0), // #E11D48
 };
 
 [[vk::binding(1, 0)]]
@@ -94,9 +95,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         if(entity.type == EntityType::None) continue;
         OutImage[int2(coord)] = DrawSmoothCircle(
             uv,
-            entity.position / maze_size_px,
+            entity.position * cell_size / maze_size_px,
             entity.radius / maze_size_px,
-            0.01f,
+            0.0001f,
             entityColor[int(entity.type)],
             OutImage[int2(coord)],
         );

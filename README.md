@@ -6,10 +6,10 @@
 - [x] Get shader working
 - [x] Get Display map
 - [x] camera system (zoom and drag)
-- [ ] Spawn energy orbs and show energy orbs
-- [ ] Show player
-- [ ] control player (only debug mode)
+- [x] Show player
+- [x] control player (only debug mode)
 - [ ] collisions
+- [ ] Spawn energy orbs and show energy orbs
 - [ ] Show player energy level
 - [ ] A\* algorithm with path showing in debug mode
 - [ ] GOAP
