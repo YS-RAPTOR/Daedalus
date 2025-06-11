@@ -3,7 +3,7 @@
 ## TODOs
 
 - [x] maze generator
-- [ ] Get shader working
+- [x] Get shader working
 - [ ] Get Display map
 - [ ] Spawn energy orbs and show energy orbs
 - [ ] Show player
