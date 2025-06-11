@@ -2,6 +2,9 @@ const std = @import("std");
 const sdl = @import("sdl");
 const config = @import("config.zig").config;
 const shader = @import("shader");
+const Maze = @import("maze.zig").Maze;
+const Cell = @import("maze.zig").Cell;
+const math = @import("math.zig");
 
 pub inline fn check(val: bool, err: anytype) !void {
     if (!val) {
@@ -10,17 +13,48 @@ pub inline fn check(val: bool, err: anytype) !void {
     }
 }
 
+pub const Entity = struct {
+    position: math.Vec2(f32) = .Zero,
+    radius: f32 = 0,
+    entiy_type: enum(u32) {
+        None,
+        Player,
+        Energy,
+    } = .None,
+};
+
 pub const Application = struct {
     allocator: std.mem.Allocator,
+
     window: *sdl.SDL_Window,
     device: *sdl.SDL_GPUDevice,
+
     last_count: u64,
     frequency: u64,
 
     pipeline: *sdl.SDL_GPUComputePipeline,
     texture: *sdl.SDL_GPUTexture,
-    uniforms: struct {
+
+    maze_buffer: *sdl.SDL_GPUBuffer,
+    maze_transfer: *sdl.SDL_GPUTransferBuffer,
+    entity_buffer: *sdl.SDL_GPUBuffer,
+    entity_transfer: *sdl.SDL_GPUTransferBuffer,
+
+    uniforms: extern struct {
+        offset: math.Vec2(f32) = .init(100, 100),
         time: f32,
+        maze_size: u32,
+        cell_size: u32,
+        wall_thickness: u32 = 0,
+        player_radius: u32 = 0,
+        energy_radius: u32 = 0,
+    },
+
+    maze: Maze,
+    entities: [config.max_entities]Entity,
+
+    game_data: struct {
+        cell_size: f32,
     },
 
     pub fn init(allocator: std.mem.Allocator) !@This() {
@@ -59,9 +93,11 @@ pub const Application = struct {
         self.last_count = sdl.SDL_GetPerformanceCounter();
         self.frequency = sdl.SDL_GetPerformanceFrequency();
 
+        // Create the compute pipeline
         self.pipeline = try self.createPipeline();
         errdefer sdl.SDL_ReleaseGPUComputePipeline(self.device, self.pipeline);
 
+        // Create the output texture
         self.texture = sdl.SDL_CreateGPUTexture(
             self.device,
             &.{
@@ -76,12 +112,69 @@ pub const Application = struct {
         ) orelse try check(false, error.CouldNotCreateTexture);
         errdefer sdl.SDL_ReleaseGPUTexture(self.device, self.texture);
 
-        self.uniforms = .{ .time = 0.0 };
+        // Setup the uniforms
+        self.uniforms = .{
+            .time = 0.0,
+            .maze_size = config.maze_size,
+            .cell_size = config.cell_size,
+        };
+
+        self.maze = try Maze.init(
+            self.allocator,
+            config.seed,
+            .{ .x = config.maze_size, .y = config.maze_size },
+        );
+        try self.maze.eller(self.allocator);
+
+        // Create the maze buffer and transfer buffer
+        self.maze_buffer = sdl.SDL_CreateGPUBuffer(
+            self.device,
+            &.{
+                .usage = sdl.SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ,
+                .size = @as(u32, @intCast(self.maze.cells.items.len)) * @sizeOf(Cell),
+            },
+        ) orelse try check(false, error.CouldNotCreateMazeBuffer);
+        errdefer sdl.SDL_ReleaseGPUBuffer(self.device, self.maze_buffer);
+
+        self.maze_transfer = sdl.SDL_CreateGPUTransferBuffer(self.device, &.{
+            .usage = sdl.SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+            .size = @as(u32, @intCast(self.maze.cells.items.len)) * @sizeOf(Cell),
+        }) orelse try check(false, error.CouldNotCreateMazeTransferBuffer);
+        errdefer sdl.SDL_ReleaseGPUTransferBuffer(self.device, self.maze_transfer);
+
+        // Create the entity buffer and transfer buffer
+        self.entity_buffer = sdl.SDL_CreateGPUBuffer(
+            self.device,
+            &.{
+                .usage = sdl.SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ,
+                .size = config.max_entities * @sizeOf(Entity),
+            },
+        ) orelse try check(false, error.CouldNotCreateEntityBuffer);
+        errdefer sdl.SDL_ReleaseGPUBuffer(self.device, self.entity_buffer);
+
+        self.entity_transfer = sdl.SDL_CreateGPUTransferBuffer(self.device, &.{
+            .usage = sdl.SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+            .size = config.max_entities * @sizeOf(Entity),
+        }) orelse try check(false, error.CouldNotCreateEntityTransferBuffer);
+        errdefer sdl.SDL_ReleaseGPUTransferBuffer(self.device, self.entity_transfer);
+
+        // Initialize Game Data
+        self.game_data = .{
+            .cell_size = @floatFromInt(config.cell_size),
+        };
 
         return self;
     }
 
     pub fn deinit(self: *@This()) void {
+        self.maze.deinit(self.allocator);
+
+        sdl.SDL_ReleaseGPUTransferBuffer(self.device, self.maze_transfer);
+        sdl.SDL_ReleaseGPUBuffer(self.device, self.maze_buffer);
+
+        sdl.SDL_ReleaseGPUTransferBuffer(self.device, self.entity_transfer);
+        sdl.SDL_ReleaseGPUBuffer(self.device, self.entity_buffer);
+
         sdl.SDL_ReleaseGPUTexture(self.device, self.texture);
         sdl.SDL_ReleaseGPUComputePipeline(self.device, self.pipeline);
         sdl.SDL_DestroyGPUDevice(self.device);
@@ -125,8 +218,21 @@ pub const Application = struct {
     }
 
     fn handleKeyboardInput(self: *@This(), keycode: u32) void {
-        _ = self;
-        _ = keycode;
+        switch (keycode) {
+            sdl.SDLK_UP, sdl.SDLK_W => {
+                self.uniforms.offset.y -= 10;
+            },
+            sdl.SDLK_DOWN, sdl.SDLK_S => {
+                self.uniforms.offset.y += 10;
+            },
+            sdl.SDLK_LEFT, sdl.SDLK_A => {
+                self.uniforms.offset.x -= 10;
+            },
+            sdl.SDLK_RIGHT, sdl.SDLK_D => {
+                self.uniforms.offset.x += 10;
+            },
+            else => {},
+        }
     }
     fn handleMouseInput(self: *@This()) void {
         _ = self;
@@ -134,6 +240,22 @@ pub const Application = struct {
 
     fn update(self: *@This(), delta_time: f32) void {
         self.uniforms.time += delta_time;
+
+        self.game_data.cell_size = @min(
+            @max(config.min_cell_size, self.game_data.cell_size),
+            config.max_cell_size,
+        );
+
+        self.uniforms.wall_thickness = @intFromFloat(
+            @round(self.game_data.cell_size * config.wall_thickness_percentage),
+        );
+        self.uniforms.player_radius = @intFromFloat(
+            @round(self.game_data.cell_size * config.player_radius_percentage),
+        );
+        self.uniforms.energy_radius = @intFromFloat(
+            @round(self.game_data.cell_size * config.energy_radius_percentage),
+        );
+        self.uniforms.cell_size = @intFromFloat(self.game_data.cell_size);
     }
 
     fn render(self: *@This()) !void {
@@ -152,6 +274,61 @@ pub const Application = struct {
         errdefer sdl.SDL_ReleaseGPUTexture(self.device, texture);
 
         if (texture) |tex| {
+            // Copy Pass
+            {
+                defer self.maze.updated = false;
+
+                // Copy Data to transfer buffer
+                if (self.maze.updated) {
+                    try self.copyToTransferBuffer(
+                        self.maze_transfer,
+                        @ptrCast(self.maze.cells.items),
+                        false,
+                    );
+                }
+                try self.copyToTransferBuffer(
+                    self.entity_transfer,
+                    @ptrCast(&self.entities),
+                    true,
+                );
+
+                const copy_pass = sdl.SDL_BeginGPUCopyPass(command_buffer) orelse {
+                    try check(false, error.CouldNotBeginCopyPass);
+                };
+                defer sdl.SDL_EndGPUCopyPass(copy_pass);
+
+                // Copy Data to GPU Buffers
+                if (self.maze.updated) {
+                    sdl.SDL_UploadToGPUBuffer(
+                        copy_pass,
+                        &.{
+                            .offset = 0,
+                            .transfer_buffer = self.maze_transfer,
+                        },
+                        &.{
+                            .buffer = self.maze_buffer,
+                            .size = @as(u32, @intCast(self.maze.cells.items.len)) * @sizeOf(Cell),
+                            .offset = 0,
+                        },
+                        false,
+                    );
+                }
+                sdl.SDL_UploadToGPUBuffer(
+                    copy_pass,
+                    &.{
+                        .offset = 0,
+                        .transfer_buffer = self.entity_transfer,
+                    },
+                    &.{
+                        .buffer = self.entity_buffer,
+                        .size = config.max_entities * @sizeOf(Entity),
+                        .offset = 0,
+                    },
+                    true,
+                );
+            }
+
+            // Compute Pass
             {
                 const texture_bindings = [_]sdl.SDL_GPUStorageTextureReadWriteBinding{
                     .{
@@ -176,6 +353,14 @@ pub const Application = struct {
                     &self.uniforms,
                     @sizeOf(@TypeOf(self.uniforms)),
                 );
+
+                sdl.SDL_BindGPUComputeStorageBuffers(
+                    compute_pass,
+                    0,
+                    &[_]*sdl.SDL_GPUBuffer{ self.maze_buffer, self.entity_buffer },
+                    2,
+                );
+
                 sdl.SDL_DispatchGPUCompute(
                     compute_pass,
                     config.window_width / 8,
@@ -184,6 +369,7 @@ pub const Application = struct {
                 );
             }
 
+            // Render
             sdl.SDL_BlitGPUTexture(command_buffer, &.{
                 .source = .{
                     .texture = self.texture,
@@ -200,6 +386,27 @@ pub const Application = struct {
             });
         }
         try check(sdl.SDL_SubmitGPUCommandBuffer(command_buffer), error.CouldNotSubmitCommandBuffer);
+    }
+
+    fn copyToTransferBuffer(
+        self: *@This(),
+        transfer_buffer: *sdl.SDL_GPUTransferBuffer,
+        buffer: []u8,
+        cycle: bool,
+    ) !void {
+        const data = sdl.SDL_MapGPUTransferBuffer(
+            self.device,
+            transfer_buffer,
+            cycle,
+        ) orelse try check(false, error.CouldNotMapTransferBuffer);
+
+        var slice: []u8 = undefined;
+        slice.ptr = @ptrCast(data);
+        slice.len = buffer.len;
+
+        @memcpy(slice, buffer);
+
+        sdl.SDL_UnmapGPUTransferBuffer(self.device, transfer_buffer);
     }
 
     fn createPipeline(self: *@This()) !*sdl.SDL_GPUComputePipeline {
@@ -230,6 +437,7 @@ pub const Application = struct {
 
             .num_readwrite_storage_textures = 1,
             .num_uniform_buffers = 1,
+            .num_readonly_storage_buffers = 2,
             .threadcount_x = 8,
             .threadcount_y = 8,
             .threadcount_z = 1,

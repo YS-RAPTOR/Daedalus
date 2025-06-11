@@ -4,10 +4,11 @@
 
 - [x] maze generator
 - [x] Get shader working
-- [ ] Get Display map
+- [x] Get Display map
 - [ ] Spawn energy orbs and show energy orbs
 - [ ] Show player
 - [ ] control player (only debug mode)
+- [ ] collisions
 - [ ] Show player energy level
 - [ ] A\* algorithm with path showing in debug mode
 - [ ] GOAP

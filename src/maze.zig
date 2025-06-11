@@ -2,9 +2,10 @@ const std = @import("std");
 const math = @import("math.zig");
 const random = std.Random;
 
-pub const Cell = packed struct(u2) {
+pub const Cell = packed struct(u8) {
     south: bool,
     east: bool,
+    padding: u6 = 0,
 
     pub const Open: @This() = .{
         .south = false,
@@ -19,21 +20,20 @@ pub const Cell = packed struct(u2) {
 
 pub const Maze = struct {
     cells: std.ArrayListUnmanaged(Cell),
-    allocator: std.mem.Allocator,
     size: math.Vec2(usize),
     rng: random.Xoshiro256,
+    updated: bool = false,
 
     pub fn getIndex(self: *@This(), x: usize, y: usize) usize {
         return y * self.size.x + x;
     }
 
-    pub fn init(allocator: std.mem.Allocator, size: math.Vec2(usize), seed: u64) !@This() {
+    pub fn init(allocator: std.mem.Allocator, seed: u64, size: math.Vec2(usize)) !@This() {
         var cells: std.ArrayListUnmanaged(Cell) = .empty;
         try cells.appendNTimes(allocator, Cell.Walled, size.x * size.y);
 
         return .{
             .cells = cells,
-            .allocator = allocator,
             .size = size,
             .rng = random.DefaultPrng.init(seed),
         };
@@ -64,15 +64,16 @@ pub const Maze = struct {
         }
     }
 
-    pub fn eller(self: *@This()) !void {
-        var current_set: std.ArrayListUnmanaged(usize) = try .initCapacity(self.allocator, self.size.x);
-        defer current_set.deinit(self.allocator);
+    pub fn eller(self: *@This(), allocator: std.mem.Allocator) !void {
+        self.updated = true;
+        var current_set: std.ArrayListUnmanaged(usize) = try .initCapacity(allocator, self.size.x);
+        defer current_set.deinit(allocator);
 
         for (0..self.size.x) |i| {
             current_set.appendAssumeCapacity(i + 1);
         }
-        var next_set: std.ArrayListUnmanaged(usize) = try .initCapacity(self.allocator, self.size.x);
-        defer next_set.deinit(self.allocator);
+        var next_set: std.ArrayListUnmanaged(usize) = try .initCapacity(allocator, self.size.x);
+        defer next_set.deinit(allocator);
 
         for (0..self.size.y) |i| {
             next_set.clearRetainingCapacity();
@@ -179,7 +180,7 @@ pub const Maze = struct {
         }
     }
 
-    pub fn deinit(self: *@This()) void {
-        self.cells.deinit(self.allocator);
+    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+        self.cells.deinit(allocator);
     }
 };
