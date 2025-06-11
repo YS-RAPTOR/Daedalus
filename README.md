@@ -8,11 +8,10 @@
 - [x] camera system (zoom and drag)
 - [x] Show player
 - [x] control player (only debug mode)
-- [ ] Spawn energy orbs and show energy orbs
-- [ ] collisions
 - [x] Show player energy level
+- [x] Spawn energy orbs and show energy orbs
+- [ ] collisions
 - [ ] A\* algorithm with path showing in debug mode
 - [ ] GOAP
 - [ ] Nearest corner detection from current position
 - [ ] steering system
-- [ ] camera follow

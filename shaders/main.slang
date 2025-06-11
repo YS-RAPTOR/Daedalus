@@ -59,6 +59,8 @@ static const float4[] entityColor = {
     float4(0.882, 0.114, 0.282, 1.0), // #E11D48
 };
 
+static const float4 energyColor = float4(0.988, 0.8, 0.149, 1.0); // #FDE047
+
 [[vk::binding(1, 0)]]
 StructuredBuffer<Entity> entities;
 
@@ -101,10 +103,23 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             0.0001f,
             entityColor[int(entity.type)],
             OutImage[int2(coord)],
-        );
+        ) * float(!out_of_bounds);
     }
 
     // Draw Energy Circles
+    let cell = maze_buffer[getIndex(cell_index)];
+    let has_energy = (cell.bitAnd(Cell.Energy)) != 0;
+
+    if (has_energy) {
+        OutImage[int2(coord)] = DrawSmoothCircle(
+            uv,
+            float2(cell_index) * cell_size / maze_size_px + 0.5f * cell_size / maze_size_px,
+            float(energy_radius) / maze_size_px,
+            0.003f,
+            energyColor,
+            OutImage[int2(coord)],
+        )  * float(!out_of_bounds);
+    }
 
 }
 

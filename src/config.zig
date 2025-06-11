@@ -20,7 +20,7 @@ const Config = struct {
     max_cell_size: u32 = 256,
     wall_thickness_percentage: f32 = 0.1,
     player_radius_percentage: f32 = 0.25,
-    energy_radius_percentage: f32 = 0.40,
+    energy_radius_percentage: f32 = 0.25,
 
     // Player
     mass: f32 = 1.0,

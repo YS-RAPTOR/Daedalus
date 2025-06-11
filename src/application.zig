@@ -146,6 +146,7 @@ pub const Application = struct {
             .{ .x = config.maze_size, .y = config.maze_size },
         );
         try self.maze.eller(self.allocator);
+        self.maze.initLocations(config.min_no_of_energy_cells, config.max_no_of_energy_cells);
 
         // Create the maze buffer and transfer buffer
         self.maze_buffer = sdl.SDL_CreateGPUBuffer(
