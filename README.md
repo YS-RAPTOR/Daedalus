@@ -10,7 +10,7 @@
 - [x] control player (only debug mode)
 - [x] Show player energy level
 - [x] Spawn energy orbs and show energy orbs
-- [ ] A\* algorithm with path showing in debug mode
+- [x] A\* algorithm with path showing in debug mode
 - [ ] GOAP
 - [ ] Nearest corner detection from current position
 - [ ] collisions
