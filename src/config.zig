@@ -9,7 +9,7 @@ const Config = struct {
     max_entities: u32 = 100,
 
     // Maze Generation
-    maze_size: u32 = 25,
+    maze_size: u32 = 100,
     seed: u64 = 0,
     min_no_of_energy_cells: u32 = 25,
     max_no_of_energy_cells: u32 = 100,

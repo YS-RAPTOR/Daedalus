@@ -1,19 +1,31 @@
 const std = @import("std");
 const math = @import("math.zig");
 const maze = @import("maze.zig");
-const heap = @import("heap.zig");
-const debug = @import("debug.zig");
 
 const AStarElem = struct {
     value: usize,
     location: math.Vec2(usize),
-    heap: heap.IntrusiveHeapField(@This()),
 };
 
-const Heap = heap.IntrusiveHeap(AStarElem, void, struct {
-    pub fn less(ctx: void, a: *AStarElem, b: *AStarElem) bool {
+const Heap = std.PriorityQueue(AStarElem, void, struct {
+    pub fn less(ctx: void, a: AStarElem, b: AStarElem) std.math.Order {
         _ = ctx;
-        return a.value < b.value;
+        if (a.value < b.value) {
+            return .lt;
+        } else if (a.value > b.value) {
+            return .gt;
+        } else {
+            // If values are equal, use heuristic to break ties
+            const heuristic_a = heuristic(a.location, b.location);
+            const heuristic_b = heuristic(b.location, a.location);
+            if (heuristic_a < heuristic_b) {
+                return .lt;
+            } else if (heuristic_a > heuristic_b) {
+                return .gt;
+            } else {
+                return .eq;
+            }
+        }
     }
 }.less);
 
@@ -37,20 +49,6 @@ fn heuristic(a: math.Vec2(usize), b: math.Vec2(usize)) usize {
     return x + y;
 }
 
-pub fn find(root: ?*AStarElem, v: *const AStarElem) ?*AStarElem {
-    const current = root orelse return null;
-
-    if (current.location.equals(v.location)) {
-        return current;
-    }
-
-    if (find(current.heap.child, v)) |found| {
-        return found;
-    }
-
-    return find(current.heap.next, v);
-}
-
 pub fn aStar(
     allocator: std.mem.Allocator,
     environment: *maze.Maze,
@@ -63,19 +61,14 @@ pub fn aStar(
 
     var closed: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), void) = .empty;
     var route: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), math.Vec2(usize)) = .empty;
-    var open: Heap = .{ .context = {} };
-    {
-        const elem: *AStarElem = try arena_allocator.create(AStarElem);
-        elem.* = .{
-            .value = heuristic(start, target),
-            .location = start,
-            .heap = .{},
-        };
-        open.insert(elem);
-    }
+    var open: Heap = .init(arena_allocator, {});
+    try open.add(.{
+        .value = heuristic(start, target),
+        .location = start,
+    });
     try route.put(arena_allocator, start, start);
 
-    while (open.deleteMin()) |e| {
+    while (open.removeOrNull()) |e| {
         try closed.put(arena_allocator, e.location, {});
         if (e.location.equals(target)) {
             var path: std.ArrayListUnmanaged(math.Vec2(usize)) = .empty;
@@ -90,7 +83,6 @@ pub fn aStar(
             return path;
         }
 
-        const timer = 
         const cost = e.value - heuristic(e.location, target);
         const neighbours = environment.getNeighbours(e.location);
 
@@ -103,26 +95,30 @@ pub fn aStar(
             const cost_h = heuristic(neighbour, target);
             const total_cost = cost_g + cost_h;
 
-            const found = find(
-                e,
-                &.{ .location = neighbour, .value = 0, .heap = .{} },
-            );
+            var found: ?AStarElem = null;
+            var iter = open.iterator();
+            var index: usize = 0;
+
+            while (iter.next()) |f| {
+                if (f.location.equals(neighbour)) {
+                    found = f;
+                    break;
+                }
+                index += 1;
+            }
 
             if (found) |f| {
                 if (f.value > total_cost) {
-                    open.remove(f);
+                    _ = open.removeIndex(index);
                 } else {
                     continue;
                 }
             }
             try route.put(arena_allocator, neighbour, e.location);
-            const elem = try arena_allocator.create(AStarElem);
-            elem.* = .{
+            try open.add(.{
                 .value = total_cost,
                 .location = neighbour,
-                .heap = .{},
-            };
-            open.insert(elem);
+            });
         }
     }
     std.debug.print("No path found from {any} to {any}\n", .{ start, target });
