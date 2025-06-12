@@ -6,18 +6,21 @@ pub const Cell = packed struct(u8) {
     south: bool,
     east: bool,
     energy: bool,
-    padding: u5 = 0,
+    path: bool,
+    padding: u4 = 0,
 
     pub const Open: @This() = .{
         .south = false,
         .east = false,
         .energy = false,
+        .path = false,
     };
 
     pub const Walled: @This() = .{
         .south = true,
         .east = true,
         .energy = false,
+        .path = false,
     };
 };
 
@@ -162,6 +165,38 @@ pub const Maze = struct {
             current_set = next_set;
             next_set = temp;
         }
+    }
+
+    pub fn getNeighbours(self: *@This(), location: math.Vec2(usize)) [4]?math.Vec2(usize) {
+        var result: [4]?math.Vec2(usize) = .{ null, null, null, null };
+        const index = self.getIndex(location.x, location.y);
+        const cell = self.cells.items[index];
+
+        if (!cell.east) {
+            result[0] = .init(location.x + 1, location.y);
+        }
+
+        if (!cell.south) {
+            result[1] = .init(location.x, location.y + 1);
+        }
+
+        if (location.x > 0) {
+            const left: math.Vec2(usize) = .init(location.x - 1, location.y);
+            const left_index = self.getIndex(left.x, left.y);
+            if (!self.cells.items[left_index].east) {
+                result[2] = left;
+            }
+        }
+
+        if (location.y > 0) {
+            const up: math.Vec2(usize) = .init(location.x, location.y - 1);
+            const up_index = self.getIndex(up.x, up.y);
+            if (!self.cells.items[up_index].south) {
+                result[3] = up;
+            }
+        }
+
+        return result;
     }
 
     pub fn print(self: *@This()) void {

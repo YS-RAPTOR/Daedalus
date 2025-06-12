@@ -109,6 +109,10 @@ pub fn Vec2(T: type) type {
         pub inline fn cross(self: @This(), other: @This()) T {
             return self.x * other.y - self.y * other.x;
         }
+
+        pub inline fn equals(self: @This(), other: @This()) bool {
+            return self.x == other.x and self.y == other.y;
+        }
     };
 }
 

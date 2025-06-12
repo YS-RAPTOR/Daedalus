@@ -5,6 +5,7 @@ const shader = @import("shader");
 const Maze = @import("maze.zig").Maze;
 const Cell = @import("maze.zig").Cell;
 const math = @import("math.zig");
+const ai = @import("ai.zig");
 
 pub inline fn check(val: bool, err: anytype) !void {
     if (!val) {
@@ -195,6 +196,19 @@ pub const Application = struct {
                 .radius = 0.0,
                 .entiy_type = .None,
             };
+        }
+
+        var path = try ai.aStar(
+            allocator,
+            &self.maze,
+            .init(0, 0),
+            .init(config.maze_size - 1, config.maze_size - 1),
+        );
+        defer path.deinit(allocator);
+
+        for (path.items) |pos| {
+            const index = self.maze.getIndex(pos.x, pos.y);
+            self.maze.cells.items[index].path = true;
         }
 
         return self;
