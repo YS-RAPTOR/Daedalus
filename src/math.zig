@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub fn Vec2(T: type) type {
     const type_info = @typeInfo(T);
 
@@ -143,6 +145,23 @@ pub fn Vec2(T: type) type {
             }
         }
     };
+}
+
+pub fn lerp(a: anytype, b: @TypeOf(a), t: f32) @TypeOf(a) {
+    var result = b.subtract(a);
+    result = result.multiply(t);
+    result = result.add(a);
+    return result;
+}
+
+pub fn slerp(a: anytype, b: @TypeOf(a), t: f32) @TypeOf(a) {
+    var dot = a.dot(b);
+    dot = @max(@min(dot, 1), -1); // Clamp dot to [-1, 1]
+
+    const theta = std.math.acos(dot) * t;
+
+    const relative_vec = b.subtract(a).multiply(dot).normalize();
+    return a.multiply(@cos(theta)).add(relative_vec.multiply(@sin(theta)));
 }
 
 pub const Color = struct {

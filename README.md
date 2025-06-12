@@ -12,6 +12,6 @@
 - [x] Spawn energy orbs and show energy orbs
 - [x] A\* algorithm with path showing in debug mode
 - [x] Nearest corner detection from current position
-- [ ] steering system
+- [x] steering system
 - [ ] GOAP
 - [ ] collisions

@@ -23,9 +23,13 @@ const Config = struct {
     energy_radius_percentage: f32 = 0.25,
 
     // Player
-    mass: f32 = 1.0,
-    friction: f32 = 0.15,
-    energy_multiplier: f32 = 0.01,
+    mass: f32 = 0.9,
+    friction: f32 = 0.10,
+    energy_multiplier: f32 = 0.01, // TODO: Change to 0.05
+    corner_reached_distance: f32 = 0.4,
+    corner_lerp_distance: f32 = 0.5,
+    slow_down_distance: f32 = 3,
+    slow_down_speed: f32 = 0.5,
 };
 
 pub const config: Config = .{};

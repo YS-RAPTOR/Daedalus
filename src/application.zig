@@ -6,6 +6,7 @@ const Maze = @import("maze.zig").Maze;
 const Cell = @import("maze.zig").Cell;
 const math = @import("math.zig");
 const ai = @import("ai.zig");
+const Entity = @import("entity.zig").Entity;
 
 pub inline fn check(val: bool, err: anytype) !void {
     if (!val) {
@@ -13,25 +14,6 @@ pub inline fn check(val: bool, err: anytype) !void {
         return err;
     }
 }
-
-pub const Entity = extern struct {
-    position: math.Vec2(f32) = .Zero,
-    radius: f32 = 0,
-    entiy_type: enum(u32) {
-        None,
-        Player10,
-        Player9,
-        Player8,
-        Player7,
-        Player6,
-        Player5,
-        Player4,
-        Player3,
-        Player2,
-        Player1,
-        Target,
-    } = .None,
-};
 
 pub const Application = struct {
     allocator: std.mem.Allocator,
@@ -64,14 +46,7 @@ pub const Application = struct {
 
     game_data: struct {
         cell_size: f32,
-        target: math.Vec2(f32),
-        player: struct {
-            position: math.Vec2(f32) = .init(0.5, 0.5),
-            velocity: math.Vec2(f32) = .Zero,
-            acceleration: math.Vec2(f32) = .Zero,
-            force: math.Vec2(f32) = .Zero,
-            energy_level: f32 = 100,
-        } = .{},
+        ai_player: ai.AI,
         drag: struct {
             is_holding_mouse: bool = false,
             held_mouse_position: math.Vec2(f32) = .Zero,
@@ -181,14 +156,16 @@ pub const Application = struct {
         }) orelse try check(false, error.CouldNotCreateEntityTransferBuffer);
         errdefer sdl.SDL_ReleaseGPUTransferBuffer(self.device, self.entity_transfer);
 
-        // Initialize Game Data
+        // Initialize Game Data and Player
         self.game_data = .{
             .cell_size = @floatFromInt(config.cell_size),
-            .target = .init(-0.5, -0.5),
+            .ai_player = try .init(
+                self.allocator,
+                .init(0, 0),
+                .init(config.maze_size - 1, config.maze_size - 1),
+                &self.maze,
+            ),
         };
-
-        const maze_float: f32 = @floatFromInt(config.maze_size);
-        self.game_data.target = self.game_data.target.add(.init(maze_float, maze_float));
 
         for (0..config.max_entities) |i| {
             self.entities[i] = .{
@@ -198,34 +175,11 @@ pub const Application = struct {
             };
         }
 
-        var path = try ai.aStar(
-            allocator,
-            &self.maze,
-            .init(0, 0),
-            .init(config.maze_size - 1, config.maze_size - 1),
-        );
-        defer path.deinit(allocator);
-
-        for (path.items) |pos| {
-            const index = self.maze.getIndex(pos.x, pos.y);
-            self.maze.cells.items[index].path = true;
-        }
-
-        var corners = try ai.findCorners(
-            allocator,
-            path.items,
-        );
-        defer corners.deinit(allocator);
-
-        for (corners.items) |corner| {
-            const index = self.maze.getIndex(corner.location.x, corner.location.y);
-            self.maze.cells.items[index].corner = true;
-        }
-
         return self;
     }
 
     pub fn deinit(self: *@This()) void {
+        self.game_data.ai_player.deinit(self.allocator);
         self.maze.deinit(self.allocator);
 
         sdl.SDL_ReleaseGPUTransferBuffer(self.device, self.maze_transfer);
@@ -299,23 +253,29 @@ pub const Application = struct {
 
             self.update(delta_time);
             try self.render();
+
+            if (self.game_data.ai_player.dead) {
+                std.debug.print("AI Player is dead. Exiting...\n", .{});
+                break :main_loop;
+            }
         }
     }
 
     fn handleKeyboardInput(self: *@This(), keycode: u32) void {
+        _ = self;
         switch (keycode) {
-            sdl.SDLK_W, sdl.SDLK_UP => {
-                self.game_data.player.force.y = -1.0;
-            },
-            sdl.SDLK_S, sdl.SDLK_DOWN => {
-                self.game_data.player.force.y = 1.0;
-            },
-            sdl.SDLK_A, sdl.SDLK_LEFT => {
-                self.game_data.player.force.x = -1.0;
-            },
-            sdl.SDLK_D, sdl.SDLK_RIGHT => {
-                self.game_data.player.force.x = 1.0;
-            },
+            // sdl.SDLK_W, sdl.SDLK_UP => {
+            //     self.game_data.player.force.y = -1.0;
+            // },
+            // sdl.SDLK_S, sdl.SDLK_DOWN => {
+            //     self.game_data.player.force.y = 1.0;
+            // },
+            // sdl.SDLK_A, sdl.SDLK_LEFT => {
+            //     self.game_data.player.force.x = -1.0;
+            // },
+            // sdl.SDLK_D, sdl.SDLK_RIGHT => {
+            //     self.game_data.player.force.x = 1.0;
+            // },
             else => {},
         }
     }
@@ -377,62 +337,15 @@ pub const Application = struct {
         );
         self.uniforms.cell_size = @intFromFloat(self.game_data.cell_size);
 
-        // Update Player Position and Velocity
-        if (self.game_data.player.velocity.length() > 0) {
-            var friction_force = self.game_data.player.velocity.normalize();
-            friction_force = friction_force.multiply(-config.friction);
-            self.game_data.player.force = self.game_data.player.force.add(friction_force);
-        }
-        self.game_data.player.acceleration = self.game_data.player.force.divide(config.mass);
-        self.game_data.player.velocity = self.game_data.player.velocity.add(
-            self.game_data.player.acceleration.multiply(delta_time),
+        self.game_data.ai_player.update(delta_time);
+
+        const entities = self.entities[0..config.max_entities];
+        var offset: usize = 0;
+        offset = self.game_data.ai_player.submitEntities(
+            entities,
+            offset,
+            self.game_data.cell_size,
         );
-        self.game_data.player.position = self.game_data.player.position.add(
-            self.game_data.player.velocity.multiply(delta_time),
-        );
-        self.game_data.player.force = .Zero;
-
-        const player_radius: f32 = self.game_data.cell_size * config.player_radius_percentage;
-
-        // Update Player Energy Level
-        const energy_consumed = self.game_data.player.velocity.trueLength() * config.energy_multiplier;
-        self.game_data.player.energy_level -= energy_consumed;
-
-        // Player
-        self.entities[0] = .{
-            .position = self.game_data.player.position,
-            .radius = player_radius,
-            .entiy_type = blk: {
-                if (self.game_data.player.energy_level > 90) {
-                    break :blk .Player10;
-                } else if (self.game_data.player.energy_level > 80) {
-                    break :blk .Player9;
-                } else if (self.game_data.player.energy_level > 70) {
-                    break :blk .Player8;
-                } else if (self.game_data.player.energy_level > 60) {
-                    break :blk .Player7;
-                } else if (self.game_data.player.energy_level > 50) {
-                    break :blk .Player6;
-                } else if (self.game_data.player.energy_level > 40) {
-                    break :blk .Player5;
-                } else if (self.game_data.player.energy_level > 30) {
-                    break :blk .Player4;
-                } else if (self.game_data.player.energy_level > 20) {
-                    break :blk .Player3;
-                } else if (self.game_data.player.energy_level > 10) {
-                    break :blk .Player2;
-                } else {
-                    break :blk .Player1;
-                }
-            },
-        };
-
-        // Target
-        self.entities[1] = .{
-            .position = self.game_data.target,
-            .radius = player_radius,
-            .entiy_type = .Target,
-        };
     }
 
     fn render(self: *@This()) !void {
