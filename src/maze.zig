@@ -7,13 +7,15 @@ pub const Cell = packed struct(u8) {
     east: bool,
     energy: bool,
     path: bool,
-    padding: u4 = 0,
+    corner: bool,
+    padding: u3 = 0,
 
     pub const Open: @This() = .{
         .south = false,
         .east = false,
         .energy = false,
         .path = false,
+        .corner = false,
     };
 
     pub const Walled: @This() = .{
@@ -21,6 +23,7 @@ pub const Cell = packed struct(u8) {
         .east = true,
         .energy = false,
         .path = false,
+        .corner = false,
     };
 };
 

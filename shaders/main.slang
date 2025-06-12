@@ -19,6 +19,7 @@ enum Cell: uint8_t {
     East,
     Energy,
     Path,
+    Corner,
 };
 
 [[vk::binding(0, 0)]]
@@ -62,6 +63,7 @@ static const float4[] entityColor = {
 
 static const float4 energyColor = float4(0.988, 0.8, 0.149, 1.0); // #FDE047
 static const float3 pathColor = float3 (0.278, 0.333, 0.412); // #475569
+static const float3 cornerColorOffset = float3(0.5, 0.5, 0.5); // #888888
 
 [[vk::binding(1, 0)]]
 StructuredBuffer<Entity> entities;
@@ -89,6 +91,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     let cell = maze_buffer[getIndex(cell_index)];
     let has_energy = (cell.bitAnd(Cell.Energy)) != 0;
     let is_path = (cell.bitAnd(Cell.Path)) != 0;
+    let is_corner = (cell.bitAnd(Cell.Corner)) != 0;
 
     color |= cell_coord.y < wall_thickness && walls.x; // North wall
     color |= cell_coord.x >= cell_size - wall_thickness && walls.y; // East wall
@@ -96,7 +99,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     color |= cell_coord.x < wall_thickness && walls.w; // West wall
 
     OutImage[int2(coord)] = float4(
-        float3(color) + float3(!color) * pathColor * float3(is_path),
+        float3(color) + float3(!color) * (pathColor * float3(is_path) + cornerColorOffset * float3(is_corner)),
         1.0f
     ) * float(!out_of_bounds);
 

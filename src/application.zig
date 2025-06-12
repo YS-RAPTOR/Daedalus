@@ -211,6 +211,17 @@ pub const Application = struct {
             self.maze.cells.items[index].path = true;
         }
 
+        var corners = try ai.findCorners(
+            allocator,
+            path.items,
+        );
+        defer corners.deinit(allocator);
+
+        for (corners.items) |corner| {
+            const index = self.maze.getIndex(corner.location.x, corner.location.y);
+            self.maze.cells.items[index].corner = true;
+        }
+
         return self;
     }
 

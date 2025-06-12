@@ -124,3 +124,36 @@ pub fn aStar(
     std.debug.print("No path found from {any} to {any}\n", .{ start, target });
     return error.NoPathFound;
 }
+
+pub const Corner = struct {
+    direction: math.Vec2(i8),
+    location: math.Vec2(usize),
+};
+
+pub fn findCorners(allocator: std.mem.Allocator, path: []const math.Vec2(usize)) !std.ArrayListUnmanaged(Corner) {
+    std.debug.assert(path.len >= 2); // Path must have at least two points
+
+    var point0: math.Vec2(isize) = path[0].cast(isize);
+    var point1: math.Vec2(isize) = path[1].cast(isize);
+
+    var direction: math.Vec2(i8) = point0.subtract(point1).cast(i8);
+    var corners: std.ArrayListUnmanaged(Corner) = .empty;
+
+    for (0..path.len - 1) |i| {
+        point0 = path[i].cast(isize);
+        point1 = path[i + 1].cast(isize);
+
+        const next_direction: math.Vec2(i8) = point0.subtract(point1).cast(i8);
+        if (!direction.equals(next_direction)) {
+            // Found a corner
+            const corner: Corner = .{
+                .direction = direction,
+                .location = path[i],
+            };
+
+            try corners.append(allocator, corner);
+            direction = next_direction;
+        }
+    }
+    return corners;
+}
