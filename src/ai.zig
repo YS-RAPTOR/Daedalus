@@ -2,6 +2,7 @@ const std = @import("std");
 const math = @import("math.zig");
 const maze = @import("maze.zig");
 const heap = @import("heap.zig");
+const debug = @import("debug.zig");
 
 const AStarElem = struct {
     value: usize,
@@ -63,14 +64,15 @@ pub fn aStar(
     var closed: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), void) = .empty;
     var route: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), math.Vec2(usize)) = .empty;
     var open: Heap = .{ .context = {} };
-
-    var elem: *AStarElem = try arena_allocator.create(AStarElem);
-    elem.* = .{
-        .value = heuristic(start, target),
-        .location = start,
-        .heap = .{},
-    };
-    open.insert(elem);
+    {
+        const elem: *AStarElem = try arena_allocator.create(AStarElem);
+        elem.* = .{
+            .value = heuristic(start, target),
+            .location = start,
+            .heap = .{},
+        };
+        open.insert(elem);
+    }
     try route.put(arena_allocator, start, start);
 
     while (open.deleteMin()) |e| {
@@ -79,25 +81,30 @@ pub fn aStar(
             var path: std.ArrayListUnmanaged(math.Vec2(usize)) = .empty;
             var current = e.location;
 
+            std.debug.print("Path found from {any} to {any}\n", .{ start, target });
             while (!current.equals(route.get(current).?)) {
                 try path.append(allocator, current);
                 current = route.get(current).?;
             }
+            try path.append(allocator, start);
             return path;
         }
 
+        const timer = 
         const cost = e.value - heuristic(e.location, target);
         const neighbours = environment.getNeighbours(e.location);
 
         for (neighbours) |null_neighbour| {
             if (null_neighbour == null) continue;
             const neighbour = null_neighbour.?;
+            if (closed.contains(neighbour)) continue;
+
             const cost_g = cost + 1;
             const cost_h = heuristic(neighbour, target);
             const total_cost = cost_g + cost_h;
 
             const found = find(
-                open.root,
+                e,
                 &.{ .location = neighbour, .value = 0, .heap = .{} },
             );
 
@@ -109,7 +116,7 @@ pub fn aStar(
                 }
             }
             try route.put(arena_allocator, neighbour, e.location);
-            elem = try arena_allocator.create(AStarElem);
+            const elem = try arena_allocator.create(AStarElem);
             elem.* = .{
                 .value = total_cost,
                 .location = neighbour,

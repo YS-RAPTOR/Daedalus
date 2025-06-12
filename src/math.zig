@@ -113,6 +113,35 @@ pub fn Vec2(T: type) type {
         pub inline fn equals(self: @This(), other: @This()) bool {
             return self.x == other.x and self.y == other.y;
         }
+
+        pub inline fn cast(self: @This(), C: type) Vec2(C) {
+            const self_info = @typeInfo(T);
+            const other_info = @typeInfo(C);
+
+            if (self_info == .int and other_info == .float) {
+                return .{
+                    .x = @floatFromInt(self.x),
+                    .y = @floatFromInt(self.y),
+                };
+            } else if (self_info == .float and other_info == .int) {
+                return .{
+                    .x = @intFromFloat(self.x),
+                    .y = @intFromFloat(self.y),
+                };
+            } else if (self_info == .int and other_info == .int) {
+                return .{
+                    .x = @intCast(self.x),
+                    .y = @intCast(self.y),
+                };
+            } else if (self_info == .float and other_info == .float) {
+                return .{
+                    .x = @floatCast(self.x),
+                    .y = @floatCast(self.y),
+                };
+            } else {
+                @compileError("Vec2 cast only supports compatible types");
+            }
+        }
     };
 }
 
