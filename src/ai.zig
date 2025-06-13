@@ -6,14 +6,14 @@ const config = @import("config.zig").config;
 const Entity = @import("entity.zig").Entity;
 
 pub const AI = struct {
+    cell_position: math.Vec2(usize),
     position: math.Vec2(f32),
     velocity: math.Vec2(f32),
     acceleration: math.Vec2(f32),
     force: math.Vec2(f32),
 
-    collisions: *maze.Maze,
-
     dead: bool = false,
+    win: bool = false,
     target: math.Vec2(f32),
     energy_level: f32,
 
@@ -255,15 +255,15 @@ pub const AI = struct {
         const target = target_position_cell.cast(f32).add(.init(0.5, 0.5));
 
         return .{
+            .cell_position = starting_position_cell,
             .force = .Zero,
             .acceleration = .Zero,
             .velocity = .Zero,
             .position = position,
             .energy_level = config.max_energy_level,
             .corners = corners,
-            .collisions = environment,
             .target = target,
-            .current_corner = corners.items.len - 1,
+            .current_corner = corners.items.len,
         };
     }
 
@@ -272,11 +272,12 @@ pub const AI = struct {
     }
 
     pub fn setDirection(self: *@This()) void {
-        if (self.current_corner < 0) {
+        if (self.current_corner == 0) {
+            self.force = self.target.subtract(self.position).normalize();
             return;
         }
 
-        const current_corner = self.corners.items[self.current_corner];
+        const current_corner = self.corners.items[self.current_corner - 1];
         const corner_position = current_corner.location.cast(f32).add(.init(0.5, 0.5));
         const displacement = corner_position.subtract(self.position);
         const distance_to_corner = displacement.trueLength();
@@ -297,18 +298,28 @@ pub const AI = struct {
 
         if (distance_to_corner < config.corner_reached_distance) {
             // Move to the next corner
-            if (self.current_corner != 0) {
-                self.current_corner -= 1;
-            }
+            self.current_corner -= 1;
         }
     }
 
-    pub fn update(self: *@This(), delta_time: f32) void {
+    pub fn update(self: *@This(), delta_time: f32, environment: *maze.Maze) void {
         if (self.dead) {
             return;
         }
 
+        if (self.win) {
+            return;
+        }
+
         self.setDirection();
+        self.cell_position = .{
+            .x = @intFromFloat(@trunc(self.position.x)),
+            .y = @intFromFloat(@trunc(self.position.y)),
+        };
+
+        if (environment.consumeEnergy(self.cell_position)) {
+            self.energy_level = config.max_energy_level;
+        }
 
         // Update Player Position and Velocity
         if (self.velocity.length() > 0) {
@@ -331,6 +342,10 @@ pub const AI = struct {
 
         if (self.energy_level < 0) {
             self.dead = true;
+        }
+
+        if (self.target.subtract(self.position).trueLength() < config.corner_reached_distance) {
+            self.win = true;
         }
     }
 

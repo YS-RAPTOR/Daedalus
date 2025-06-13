@@ -6,6 +6,7 @@ RWTexture2D<float4> OutImage;
 cbuffer Uniforms
 {
     float2 offset;
+    uint2 highlight_cell;
     float time;
     uint maze_size;
     uint cell_size;
@@ -46,7 +47,7 @@ struct Entity {
     EntityType type;
 }
 
-static const float4[] entityColor = {
+static const float4[] entity_color = {
     float4(0.0f, 0.0f, 0.0f, 0.0f), // None
     float4(0.8, 0.984, 0.945, 1.0), //#ccfbf1
     float4(0.6f, 0.964f, 0.894f, 1.0f), // #99f6e4
@@ -61,9 +62,10 @@ static const float4[] entityColor = {
     float4(0.882, 0.114, 0.282, 1.0), // #E11D48
 };
 
-static const float4 energyColor = float4(0.988, 0.8, 0.149, 1.0); // #FDE047
-static const float3 pathColor = float3 (0.278, 0.333, 0.412); // #475569
-static const float3 cornerColorOffset = float3(0.5, 0.5, 0.5); // #888888
+static const float4 energy_color = float4(0.988, 0.8, 0.149, 1.0); // #FDE047
+static const float3 path_color = float3 (0.278, 0.333, 0.412); // #475569
+static const float3 corner_color_offset = float3(0.5, 0.5, 0.5); // #888888
+static const float3 highlight_color = float3(0.9098, 0.4745, 0.9765); // #e879f9
 
 [[vk::binding(1, 0)]]
 StructuredBuffer<Entity> entities;
@@ -92,6 +94,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     let has_energy = (cell.bitAnd(Cell.Energy)) != 0;
     let is_path = (cell.bitAnd(Cell.Path)) != 0;
     let is_corner = (cell.bitAnd(Cell.Corner)) != 0;
+    let is_highlighted = cell_index.x == highlight_cell.x && cell_index.y == highlight_cell.y;
+
 
     color |= cell_coord.y < wall_thickness && walls.x; // North wall
     color |= cell_coord.x >= cell_size - wall_thickness && walls.y; // East wall
@@ -99,9 +103,13 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     color |= cell_coord.x < wall_thickness && walls.w; // West wall
 
     OutImage[int2(coord)] = float4(
-        float3(color) + float3(!color) * (pathColor * float3(is_path) + cornerColorOffset * float3(is_corner)),
-        1.0f
-    ) * float(!out_of_bounds);
+        (path_color * float3(is_path) + corner_color_offset * float3(is_corner)),
+        1.0f,
+    );
+    OutImage[int2(coord)] = float4(
+        (highlight_color * float3(is_highlighted) + OutImage[int2(coord)].xyz * float3(!is_highlighted)),
+        1.0f,
+    );
 
     // Draw Entities
     let uv = offset_coord / maze_size_px;
@@ -113,9 +121,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             entity.position * cell_size / maze_size_px,
             entity.radius / maze_size_px,
             0.0001f,
-            entityColor[int(entity.type)],
+            entity_color[int(entity.type)],
             OutImage[int2(coord)],
-        ) * float(!out_of_bounds);
+        );
     }
 
 
@@ -125,11 +133,15 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             float2(cell_index) * cell_size / maze_size_px + 0.5f * cell_size / maze_size_px,
             float(energy_radius) / maze_size_px,
             0.003f,
-            energyColor,
+            energy_color,
             OutImage[int2(coord)],
-        )  * float(!out_of_bounds);
+        );
     }
 
+    OutImage[int2(coord)] = float4(
+        float3(color) + float(!color) * OutImage[int2(coord)].xyz,
+        1.0f,
+    ) * float(!out_of_bounds);
 }
 
 float4 DrawSmoothCircle(float2 uv, float2 center, float radius, float edgeSoftness, float4 circleColor, float4 bgColor)

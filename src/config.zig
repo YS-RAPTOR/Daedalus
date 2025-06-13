@@ -10,8 +10,8 @@ const Config = struct {
 
     // Maze Generation
     seed: u64 = 0,
-    maze_size: u32 = 50,
-    no_of_energy_cells: u32 = 100,
+    maze_size: u32 = 100,
+    no_of_energy_cells: u32 = 20,
 
     // Render
     cell_size: u32 = 50,
@@ -25,7 +25,7 @@ const Config = struct {
     mass: f32 = 0.9,
     friction: f32 = 0.10,
     max_energy_level: f32 = 100.0,
-    energy_multiplier: f32 = 0.05,
+    energy_multiplier: f32 = 0.01,
     energy_mistake_multiplier: f32 = 0.015,
     corner_reached_distance: f32 = 0.4,
     corner_lerp_distance: f32 = 0.5,

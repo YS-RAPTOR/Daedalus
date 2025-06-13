@@ -34,6 +34,7 @@ pub const Application = struct {
 
     uniforms: extern struct {
         offset: math.Vec2(f32) = .init(100, 100),
+        highlighted_cell: math.Vec2(u32) = .init(0, 0),
         time: f32,
         maze_size: u32,
         cell_size: u32,
@@ -45,6 +46,7 @@ pub const Application = struct {
     entities: [config.max_entities]Entity,
 
     game_data: struct {
+        paused: bool = true,
         cell_size: f32,
         ai_player: ai.AI,
         drag: struct {
@@ -172,6 +174,11 @@ pub const Application = struct {
                 .entiy_type = .None,
             };
         }
+        _ = self.game_data.ai_player.submitEntities(
+            self.entities[0..config.max_entities],
+            0,
+            config.cell_size,
+        );
 
         self.last_count = sdl.SDL_GetPerformanceCounter();
         self.frequency = sdl.SDL_GetPerformanceFrequency();
@@ -201,6 +208,11 @@ pub const Application = struct {
         main_loop: while (true) {
             if (self.game_data.ai_player.dead) {
                 std.debug.print("AI Player is dead. Exiting...\n", .{});
+                break :main_loop;
+            }
+
+            if (self.game_data.ai_player.win) {
+                std.debug.print("AI Player won! Exiting...\n", .{});
                 break :main_loop;
             }
 
@@ -263,7 +275,6 @@ pub const Application = struct {
     }
 
     fn handleKeyboardInput(self: *@This(), keycode: u32) void {
-        _ = self;
         switch (keycode) {
             // sdl.SDLK_W, sdl.SDLK_UP => {
             //     self.game_data.player.force.y = -1.0;
@@ -277,6 +288,10 @@ pub const Application = struct {
             // sdl.SDLK_D, sdl.SDLK_RIGHT => {
             //     self.game_data.player.force.x = 1.0;
             // },
+            sdl.SDLK_SPACE => {
+                // Toggle pause state
+                self.game_data.paused = !self.game_data.paused;
+            },
             else => {},
         }
     }
@@ -337,8 +352,13 @@ pub const Application = struct {
             @round(self.game_data.cell_size * config.energy_radius_percentage),
         );
         self.uniforms.cell_size = @intFromFloat(self.game_data.cell_size);
+        self.uniforms.highlighted_cell = self.game_data.ai_player.cell_position.cast(u32);
 
-        self.game_data.ai_player.update(delta_time);
+        if (self.game_data.paused) {
+            return;
+        }
+
+        self.game_data.ai_player.update(delta_time, &self.maze);
 
         const entities = self.entities[0..config.max_entities];
         var offset: usize = 0;

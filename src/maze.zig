@@ -200,6 +200,16 @@ pub const Maze = struct {
         return result;
     }
 
+    pub fn consumeEnergy(self: *@This(), location: math.Vec2(usize)) bool {
+        const index = self.getIndex(location.x, location.y);
+        if (self.cells.items[index].energy) {
+            self.cells.items[index].energy = false;
+            self.updated = true;
+            return true;
+        }
+        return false;
+    }
+
     pub fn print(self: *@This()) void {
         std.debug.print("+", .{});
         for (0..self.size.x) |_| {
