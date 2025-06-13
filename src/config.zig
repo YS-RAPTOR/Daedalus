@@ -9,8 +9,8 @@ const Config = struct {
     max_entities: u32 = 100,
 
     // Maze Generation
-    maze_size: u32 = 50,
     seed: u64 = 0,
+    maze_size: u32 = 50,
     no_of_energy_cells: u32 = 100,
 
     // Render
@@ -34,13 +34,13 @@ const Config = struct {
 };
 
 // CONFIGURATION 1:
-// energy_multiplier = 0.01
-// no_of_energy_cells = 20
-// max_energy_level = 100
+// .energy_multiplier = 0.01
+// .no_of_energy_cells = 20
+// .maze_size = 100
 //
 // CONFIGURATION 2:
-// energy_multiplier = 0.05
-// no_of_energy_cells = 50
-// max_energy_level = 100
+// .energy_multiplier = 0.05
+// .no_of_energy_cells = 100
+// .maze_size = 50
 
 pub const config: Config = .{};
