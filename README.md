@@ -13,5 +13,8 @@
 - [x] A\* algorithm with path showing in debug mode
 - [x] Nearest corner detection from current position
 - [x] steering system
-- [ ] GOAP
-- [ ] collisions
+- [x] GOAP
+
+## Optional
+
+- [ ] optional collisions

@@ -87,9 +87,6 @@ pub const Application = struct {
         // Show the window
         try check(sdl.SDL_ShowWindow(self.window), error.CouldNotShowWindow);
 
-        self.last_count = sdl.SDL_GetPerformanceCounter();
-        self.frequency = sdl.SDL_GetPerformanceFrequency();
-
         // Create the compute pipeline
         self.pipeline = try self.createPipeline();
         errdefer sdl.SDL_ReleaseGPUComputePipeline(self.device, self.pipeline);
@@ -122,7 +119,8 @@ pub const Application = struct {
             .{ .x = config.maze_size, .y = config.maze_size },
         );
         try self.maze.eller(self.allocator);
-        self.maze.initLocations(config.min_no_of_energy_cells, config.max_no_of_energy_cells);
+        self.maze.initLocations(config.no_of_energy_cells);
+        errdefer self.maze.deinit(self.allocator);
 
         // Create the maze buffer and transfer buffer
         self.maze_buffer = sdl.SDL_CreateGPUBuffer(
@@ -175,6 +173,9 @@ pub const Application = struct {
             };
         }
 
+        self.last_count = sdl.SDL_GetPerformanceCounter();
+        self.frequency = sdl.SDL_GetPerformanceFrequency();
+
         return self;
     }
 
@@ -198,6 +199,11 @@ pub const Application = struct {
     pub fn run(self: *@This()) !void {
         var event: sdl.SDL_Event = undefined;
         main_loop: while (true) {
+            if (self.game_data.ai_player.dead) {
+                std.debug.print("AI Player is dead. Exiting...\n", .{});
+                break :main_loop;
+            }
+
             const current_count = sdl.SDL_GetPerformanceCounter();
             const delta_time: f32 = @as(
                 f32,
@@ -253,11 +259,6 @@ pub const Application = struct {
 
             self.update(delta_time);
             try self.render();
-
-            if (self.game_data.ai_player.dead) {
-                std.debug.print("AI Player is dead. Exiting...\n", .{});
-                break :main_loop;
-            }
         }
     }
 

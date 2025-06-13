@@ -29,7 +29,7 @@ const Heap = std.PriorityQueue(AStarElem, void, struct {
     }
 }.order);
 
-fn heuristic(a: math.Vec2(usize), b: math.Vec2(usize)) usize {
+pub fn heuristic(a: math.Vec2(usize), b: math.Vec2(usize)) usize {
     const x = blk: {
         if (a.x > b.x) {
             break :blk a.x - b.x;
@@ -54,6 +54,7 @@ pub fn aStar(
     environment: *maze.Maze,
     start: math.Vec2(usize),
     target: math.Vec2(usize),
+    max_cost: ?usize,
 ) !std.ArrayListUnmanaged(math.Vec2(usize)) {
     var arena = std.heap.ArenaAllocator.init(allocator);
     const arena_allocator = arena.allocator();
@@ -78,11 +79,15 @@ pub fn aStar(
                 try path.append(allocator, current);
                 current = route.get(current).?;
             }
-            try path.append(allocator, start);
             return path;
         }
 
         const cost = e.value - heuristic(e.location, target);
+        if (max_cost) |mc| {
+            if (cost > mc) {
+                continue;
+            }
+        }
         const neighbours = environment.getNeighbours(e.location);
 
         for (neighbours) |null_neighbour| {
@@ -120,7 +125,6 @@ pub fn aStar(
             });
         }
     }
-    std.debug.print("No path found from {any} to {any}\n", .{ start, target });
     return error.NoPathFound;
 }
 

@@ -9,10 +9,9 @@ const Config = struct {
     max_entities: u32 = 100,
 
     // Maze Generation
-    maze_size: u32 = 100,
+    maze_size: u32 = 50,
     seed: u64 = 0,
-    min_no_of_energy_cells: u32 = 25,
-    max_no_of_energy_cells: u32 = 100,
+    no_of_energy_cells: u32 = 100,
 
     // Render
     cell_size: u32 = 50,
@@ -25,11 +24,23 @@ const Config = struct {
     // Player
     mass: f32 = 0.9,
     friction: f32 = 0.10,
-    energy_multiplier: f32 = 0.01, // TODO: Change to 0.05
+    max_energy_level: f32 = 100.0,
+    energy_multiplier: f32 = 0.05,
+    energy_mistake_multiplier: f32 = 0.015,
     corner_reached_distance: f32 = 0.4,
     corner_lerp_distance: f32 = 0.5,
     slow_down_distance: f32 = 3,
     slow_down_speed: f32 = 0.5,
 };
+
+// CONFIGURATION 1:
+// energy_multiplier = 0.01
+// no_of_energy_cells = 20
+// max_energy_level = 100
+//
+// CONFIGURATION 2:
+// energy_multiplier = 0.05
+// no_of_energy_cells = 50
+// max_energy_level = 100
 
 pub const config: Config = .{};

@@ -154,16 +154,6 @@ pub fn lerp(a: anytype, b: @TypeOf(a), t: f32) @TypeOf(a) {
     return result;
 }
 
-pub fn slerp(a: anytype, b: @TypeOf(a), t: f32) @TypeOf(a) {
-    var dot = a.dot(b);
-    dot = @max(@min(dot, 1), -1); // Clamp dot to [-1, 1]
-
-    const theta = std.math.acos(dot) * t;
-
-    const relative_vec = b.subtract(a).multiply(dot).normalize();
-    return a.multiply(@cos(theta)).add(relative_vec.multiply(@sin(theta)));
-}
-
 pub const Color = struct {
     r: u8,
     g: u8,
