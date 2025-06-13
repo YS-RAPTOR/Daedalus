@@ -5,16 +5,7 @@ pub const Entity = extern struct {
     radius: f32 = 0,
     entiy_type: enum(u32) {
         None,
-        Player10,
-        Player9,
-        Player8,
-        Player7,
-        Player6,
-        Player5,
-        Player4,
-        Player3,
-        Player2,
-        Player1,
+        Player,
         Target,
     } = .None,
 };

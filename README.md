@@ -2,7 +2,7 @@
 
 ## TODOs
 
-- [ ] Remove energy system
+- [x] Remove energy system
 - [ ] Environmental Memory and limited visibility
 - [ ] Dynamic maze shifting
 - [ ] Environmental Invalidation

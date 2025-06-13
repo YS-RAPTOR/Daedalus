@@ -5,15 +5,19 @@ const random = std.Random;
 pub const Cell = packed struct(u8) {
     south: bool,
     east: bool,
-    energy: bool,
+    lever: bool,
+    south_door: bool,
+    east_door: bool,
     path: bool,
     corner: bool,
-    padding: u3 = 0,
+    padding: u1 = 0,
 
     pub const Open: @This() = .{
         .south = false,
         .east = false,
-        .energy = false,
+        .lever = false,
+        .south_door = false,
+        .east_door = false,
         .path = false,
         .corner = false,
     };
@@ -21,7 +25,9 @@ pub const Cell = packed struct(u8) {
     pub const Walled: @This() = .{
         .south = true,
         .east = true,
-        .energy = false,
+        .lever = false,
+        .south_door = false,
+        .east_door = false,
         .path = false,
         .corner = false,
     };
@@ -29,6 +35,7 @@ pub const Cell = packed struct(u8) {
 
 pub const Maze = struct {
     cells: std.ArrayListUnmanaged(Cell),
+    // TODO: Add something like lever control to map levers and doors
     size: math.Vec2(usize),
     rng: random.Xoshiro256,
     updated: bool = false,
@@ -48,11 +55,10 @@ pub const Maze = struct {
         };
     }
 
-    pub fn initLocations(self: *@This(), no_of_cells: usize) void {
-        for (0..no_of_cells) |_| {
-            const random_index = self.rng.random().uintLessThan(usize, self.size.x * self.size.y);
-            self.cells.items[random_index].energy = true;
-        }
+    pub fn initLocations(self: *@This(), no_of_doors: usize) void {
+        // TODO: Initialize doors, levers, and other locations in the maze
+        _ = self;
+        _ = no_of_doors;
     }
 
     fn extendDown(self: *@This(), id: usize, cells: []Cell, ids: []usize) void {
@@ -198,16 +204,6 @@ pub const Maze = struct {
         }
 
         return result;
-    }
-
-    pub fn consumeEnergy(self: *@This(), location: math.Vec2(usize)) bool {
-        const index = self.getIndex(location.x, location.y);
-        if (self.cells.items[index].energy) {
-            self.cells.items[index].energy = false;
-            self.updated = true;
-            return true;
-        }
-        return false;
     }
 
     pub fn print(self: *@This()) void {

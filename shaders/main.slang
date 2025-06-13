@@ -11,14 +11,16 @@ cbuffer Uniforms
     uint maze_size;
     uint cell_size;
     uint wall_thickness;
-    uint energy_radius;
+    uint lever_radius;
 };
 
 [Flags]
 enum Cell: uint8_t {
     South,
     East,
-    Energy,
+    Lever,
+    SouthDoor,
+    EastDoor,
     Path,
     Corner,
 };
@@ -28,16 +30,7 @@ StructuredBuffer<Cell> maze_buffer;
 
 enum EntityType: int {
     None,
-    Player10,
-    Player9,
-    Player8,
-    Player7,
-    Player6,
-    Player5,
-    Player4,
-    Player3,
-    Player2,
-    Player1,
+    Player,
     Target,
 };
 
@@ -49,20 +42,11 @@ struct Entity {
 
 static const float4[] entity_color = {
     float4(0.0f, 0.0f, 0.0f, 0.0f), // None
-    float4(0.8, 0.984, 0.945, 1.0), //#ccfbf1
-    float4(0.6f, 0.964f, 0.894f, 1.0f), // #99f6e4
-    float4(0.369f, 0.918f, 0.831f, 1.0f), // #5eead4
-    float4(0.176f, 0.831f, 0.749f, 1.0f), // #2dd4bf
     float4(0.078f, 0.722f, 0.651f, 1.0f), // #14b8a6
-    float4(0.051f, 0.58f, 0.533f, 1.0f),  // #0d9488
-    float4(0.059f, 0.463f, 0.431f, 1.0f), // #0f766e
-    float4(0.067f, 0.369f, 0.349f, 1.0f), // #115e59
-    float4(0.075f, 0.306f, 0.29f, 1.0f),  // #134e4a
-    float4(0.016f, 0.184f, 0.18f, 1.0f),  // #042f2e
     float4(0.882, 0.114, 0.282, 1.0), // #E11D48
 };
 
-static const float4 energy_color = float4(0.988, 0.8, 0.149, 1.0); // #FDE047
+static const float4 lever_color = float4(0.988, 0.8, 0.149, 1.0); // #FDE047
 static const float3 path_color = float3 (0.278, 0.333, 0.412); // #475569
 static const float3 corner_color_offset = float3(0.5, 0.5, 0.5); // #888888
 static const float3 highlight_color = float3(0.9098, 0.4745, 0.9765); // #e879f9
@@ -91,10 +75,10 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     let cell_coord = int2(floor(offset_coord)) % cell_size;
 
     let cell = maze_buffer[getIndex(cell_index)];
-    let has_energy = (cell.bitAnd(Cell.Energy)) != 0;
     let is_path = (cell.bitAnd(Cell.Path)) != 0;
     let is_corner = (cell.bitAnd(Cell.Corner)) != 0;
     let is_highlighted = cell_index.x == highlight_cell.x && cell_index.y == highlight_cell.y;
+    let has_lever = (cell.bitAnd(Cell.Lever)) != 0;
 
 
     color |= cell_coord.y < wall_thickness && walls.x; // North wall
@@ -127,13 +111,13 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     }
 
 
-    if (has_energy) {
+    if (has_lever) {
         OutImage[int2(coord)] = DrawSmoothCircle(
             uv,
             float2(cell_index) * cell_size / maze_size_px + 0.5f * cell_size / maze_size_px,
-            float(energy_radius) / maze_size_px,
+            float(lever_radius) / maze_size_px,
             0.003f,
-            energy_color,
+            lever_color,
             OutImage[int2(coord)],
         );
     }

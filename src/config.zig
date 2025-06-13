@@ -11,7 +11,7 @@ const Config = struct {
     // Maze Generation
     seed: u64 = 0,
     maze_size: u32 = 100,
-    no_of_energy_cells: u32 = 20,
+    no_of_doors: u32 = 5,
 
     // Render
     cell_size: u32 = 50,
@@ -19,28 +19,15 @@ const Config = struct {
     max_cell_size: u32 = 256,
     wall_thickness_percentage: f32 = 0.1,
     player_radius_percentage: f32 = 0.25,
-    energy_radius_percentage: f32 = 0.25,
+    lever_radius_percentage: f32 = 0.25,
 
     // Player
     mass: f32 = 0.9,
     friction: f32 = 0.10,
-    max_energy_level: f32 = 100.0,
-    energy_multiplier: f32 = 0.01,
-    energy_mistake_multiplier: f32 = 0.015,
     corner_reached_distance: f32 = 0.4,
     corner_lerp_distance: f32 = 0.5,
     slow_down_distance: f32 = 3,
     slow_down_speed: f32 = 0.5,
 };
-
-// CONFIGURATION 1:
-// .energy_multiplier = 0.01
-// .no_of_energy_cells = 20
-// .maze_size = 100
-//
-// CONFIGURATION 2:
-// .energy_multiplier = 0.05
-// .no_of_energy_cells = 100
-// .maze_size = 50
 
 pub const config: Config = .{};

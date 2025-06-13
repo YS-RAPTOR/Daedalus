@@ -121,7 +121,7 @@ pub const Application = struct {
             .{ .x = config.maze_size, .y = config.maze_size },
         );
         try self.maze.eller(self.allocator);
-        self.maze.initLocations(config.no_of_energy_cells);
+        self.maze.initLocations(config.no_of_doors);
         errdefer self.maze.deinit(self.allocator);
 
         // Create the maze buffer and transfer buffer
@@ -349,7 +349,7 @@ pub const Application = struct {
             @round(self.game_data.cell_size * config.wall_thickness_percentage),
         );
         self.uniforms.energy_radius = @intFromFloat(
-            @round(self.game_data.cell_size * config.energy_radius_percentage),
+            @round(self.game_data.cell_size * config.lever_radius_percentage),
         );
         self.uniforms.cell_size = @intFromFloat(self.game_data.cell_size);
         self.uniforms.highlighted_cell = self.game_data.ai_player.cell_position.cast(u32);
