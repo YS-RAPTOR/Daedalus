@@ -268,7 +268,7 @@ pub const Application = struct {
                 }
             }
 
-            try self.update(delta_time);
+            try self.update(@min(delta_time, 0.33));
             try self.render();
         }
     }
