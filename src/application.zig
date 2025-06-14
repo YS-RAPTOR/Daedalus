@@ -46,9 +46,8 @@ pub const Application = struct {
     entities: [config.max_entities]Entity,
 
     game_data: struct {
-        // TODO: Change them back
-        paused: bool = false,
-        limited_visibility: bool = true,
+        paused: bool = true,
+        limited_visibility: bool = false,
         cell_size: f32,
         ai_player: ai.AI,
         drag: struct {
@@ -161,8 +160,7 @@ pub const Application = struct {
             .cell_size = @floatFromInt(config.cell_size),
             .ai_player = try .init(
                 self.allocator,
-                // TODO: Change this
-                .init(2, 10),
+                .init(0, 0),
                 .init(config.maze_size - 1, config.maze_size - 1),
                 &self.maze,
             ),

@@ -98,6 +98,7 @@ pub const AI = struct {
             environment,
             self.cell_position,
         );
+        self.environment.visitCell(self.cell_position);
 
         _ = should_replan;
         // self.setDirection();

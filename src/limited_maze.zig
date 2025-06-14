@@ -14,7 +14,7 @@ const Unexplored = packed struct(u8) {
 
 pub const LimitedMaze = struct {
     cells: []Cell,
-    folks: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), Unexplored),
+    unexplored: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), Unexplored),
     size: math.Vec2(usize),
 
     doors_found: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), void),
@@ -28,7 +28,7 @@ pub const LimitedMaze = struct {
     pub fn init(allocator: std.mem.Allocator, size: math.Vec2(usize)) !@This() {
         const self: @This() = .{
             .cells = try allocator.alloc(Cell, size.x * size.y),
-            .folks = .empty,
+            .unexplored = .empty,
             .size = size,
             .doors_found = .empty,
             .levers_found = .empty,
@@ -41,7 +41,7 @@ pub const LimitedMaze = struct {
 
     pub fn deinit(self: *@This()) void {
         self.allocator.free(self.cells);
-        self.folks.deinit(self.allocator);
+        self.unexplored.deinit(self.allocator);
         self.doors_found.deinit(self.allocator);
         self.levers_found.deinit(self.allocator);
     }
@@ -192,9 +192,13 @@ pub const LimitedMaze = struct {
                 }
             }
 
-            self.cells[index] = environment.cells[index];
-            self.cells[index].path = false;
-            self.cells[index].corner = false;
+            const was_explored = self.cells[index].explored;
+
+            self.cells[index].south = environment.cells[index].south;
+            self.cells[index].east = environment.cells[index].east;
+            self.cells[index].south_door = environment.cells[index].south_door;
+            self.cells[index].east_door = environment.cells[index].east_door;
+            self.cells[index].lever = environment.cells[index].lever;
             self.cells[index].explored = true;
 
             if (self.cells[index].lever) {
@@ -212,8 +216,11 @@ pub const LimitedMaze = struct {
             }
 
             if (getUnexplored(direction, neighbours)) |unexplored| {
-                try self.folks.put(self.allocator, location, unexplored);
-                self.cells[index].path = true;
+                if (!was_explored) {
+                    try self.unexplored.put(self.allocator, location, unexplored);
+                    self.cells[index].path = true;
+                    std.debug.print("Added location {} to unexplored\n", .{location});
+                }
             }
 
             if (neighbours[@intFromEnum(direction)]) |new| {
@@ -233,6 +240,7 @@ pub const LimitedMaze = struct {
                     }
                     self.cells[up_index].south = environment.cells[up_index].south;
                     self.cells[up_index].south_door = environment.cells[up_index].south_door;
+                    self.cells[up_index].explored = true;
 
                     if (self.cells[up_index].south_door) {
                         if (!self.doors_found.contains(up)) {
@@ -255,6 +263,7 @@ pub const LimitedMaze = struct {
 
                     self.cells[left_index].east = environment.cells[left_index].east;
                     self.cells[left_index].east_door = environment.cells[left_index].east_door;
+                    self.cells[left_index].explored = true;
 
                     if (self.cells[left_index].east_door) {
                         if (!self.doors_found.contains(left)) {
@@ -302,20 +311,34 @@ pub const LimitedMaze = struct {
         return should_replan;
     }
 
-    pub fn flipLever(self: *@This(), environment: *maze.Maze, location: math.Vec2(usize)) !void {
+    pub fn flipLever(self: *@This(), environment: *maze.Maze, location: math.Vec2(usize)) !bool {
         if (!environment.flipLever(location)) {
-            return;
+            return false;
         }
+        var known_door_removed = false;
         const door_location = environment.levers_to_doors.get(location) orelse unreachable;
         if (self.doors_found.contains(door_location)) {
             const door_index = self.getIndex(door_location.x, door_location.y);
-
+            known_door_removed = true;
             if (self.cells[door_index].south_door) {
                 self.cells[door_index].south = false;
+                self.cells[door_index].south_door = false;
             } else if (self.cells[door_index].east_door) {
                 self.cells[door_index].east = false;
+                self.cells[door_index].east_door = false;
             }
+            _ = self.doors_found.swapRemove(door_location);
         }
         self.cells[self.getIndex(location.x, location.y)].lever = false;
+        _ = self.levers_found.swapRemove(location);
+
+        return known_door_removed;
+    }
+
+    pub fn visitCell(self: *@This(), location: math.Vec2(usize)) void {
+        const index = self.getIndex(location.x, location.y);
+        self.cells[index].path = false;
+        self.cells[index].corner = false;
+        _ = self.unexplored.swapRemove(location);
     }
 };

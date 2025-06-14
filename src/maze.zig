@@ -383,13 +383,17 @@ pub const Maze = struct {
 
         if (self.cells[door_index].south_door) {
             self.cells[door_index].south = false;
+            self.cells[door_index].south_door = false;
         } else if (self.cells[door_index].east_door) {
             self.cells[door_index].east = false;
+            self.cells[door_index].east_door = false;
         } else {
             unreachable;
         }
         const index = std.mem.indexOfScalar(usize, self.randomizable_doors.items, door_index) orelse return true;
         _ = self.randomizable_doors.swapRemove(index);
+        _ = self.doors_to_levers.swapRemove(door_location);
+        _ = self.levers_to_doors.swapRemove(location);
         return true;
     }
 
