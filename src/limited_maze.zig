@@ -187,26 +187,28 @@ pub const LimitedMaze = struct {
         const neighbours = environment.getNeighbours(current_location);
         var should_replan: bool = false;
 
-        should_replan = should_replan or try self.increaseVisibilityInDirection(
+        if (try self.increaseVisibilityInDirection(
             environment,
             current_location,
             .East,
-        );
-        should_replan = should_replan or try self.increaseVisibilityInDirection(
+        )) should_replan = true;
+        if (try self.increaseVisibilityInDirection(
             environment,
             current_location,
             .South,
-        );
-        should_replan = should_replan or try self.increaseVisibilityInDirection(
+        )) should_replan = true;
+
+        if (try self.increaseVisibilityInDirection(
             environment,
             neighbours[2],
             .West,
-        );
-        should_replan = should_replan or try self.increaseVisibilityInDirection(
+        )) should_replan = true;
+
+        if (try self.increaseVisibilityInDirection(
             environment,
             neighbours[3],
             .North,
-        );
+        )) should_replan = true;
         return should_replan;
     }
 
