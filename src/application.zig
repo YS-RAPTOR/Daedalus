@@ -297,7 +297,7 @@ pub const Application = struct {
             },
             sdl.SDLK_E => {
                 // Flick lever
-                self.maze.flipLever(self.game_data.ai_player.cell_position);
+                _ = self.maze.flipLever(self.game_data.ai_player.cell_position);
             },
             else => {},
         }
@@ -365,6 +365,7 @@ pub const Application = struct {
             return;
         }
 
+        self.maze.update(delta_time);
         try self.game_data.ai_player.update(delta_time, &self.maze);
 
         const entities = self.entities[0..config.max_entities];

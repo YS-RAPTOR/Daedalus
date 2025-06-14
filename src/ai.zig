@@ -94,12 +94,14 @@ pub const AI = struct {
             .x = @intFromFloat(@trunc(self.position.x)),
             .y = @intFromFloat(@trunc(self.position.y)),
         };
-        try self.environment.increaseVisibility(
+        const should_replan = try self.environment.increaseVisibility(
             environment,
             self.cell_position,
         );
 
+        _ = should_replan;
         // self.setDirection();
+        try self.environment.flipLever(environment, self.cell_position);
 
         // Update Player Position and Velocity
         if (self.velocity.length() > 0) {

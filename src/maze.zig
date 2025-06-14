@@ -11,7 +11,7 @@ pub const Cell = packed struct(u8) {
     east_door: bool,
     path: bool,
     corner: bool,
-    invalid: bool,
+    padding: u1,
 
     pub const Open: @This() = .{
         .south = false,
@@ -21,7 +21,7 @@ pub const Cell = packed struct(u8) {
         .east_door = false,
         .path = false,
         .corner = false,
-        .invalid = false,
+        .padding = 0,
     };
 
     pub const Walled: @This() = .{
@@ -32,17 +32,18 @@ pub const Cell = packed struct(u8) {
         .east_door = false,
         .path = false,
         .corner = false,
-        .invalid = false,
+        .padding = 0,
     };
 };
 
 pub const Maze = struct {
     cells: []Cell,
-    // permutations: [no_of_doors * 2][]Cell,
     size: math.Vec2(usize),
     rng: random.Xoshiro256,
     levers_to_doors: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), math.Vec2(usize)),
     doors_to_levers: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), math.Vec2(usize)),
+    randomizable_doors: std.ArrayListUnmanaged(usize),
+    duration: f32,
 
     pub fn getIndex(self: *@This(), x: usize, y: usize) usize {
         return y * self.size.x + x;
@@ -57,11 +58,28 @@ pub const Maze = struct {
             .rng = random.DefaultPrng.init(seed),
             .levers_to_doors = .empty,
             .doors_to_levers = .empty,
+            .randomizable_doors = try .initCapacity(allocator, size.x * size.y),
+            .duration = 0.0,
         };
 
         try self.eller(allocator);
         try self.initDoorsAndLevers(allocator);
+        self.randomizeDoors();
         return self;
+    }
+
+    pub fn randomizeDoors(self: *@This()) void {
+        for (self.randomizable_doors.items) |door_index| {
+            // Random chance to open the door
+            const open = self.rng.random().boolean();
+            if (self.cells[door_index].south_door) {
+                self.cells[door_index].south = open;
+            } else if (self.cells[door_index].east_door) {
+                self.cells[door_index].east = open;
+            } else {
+                unreachable; // Should not happen
+            }
+        }
     }
 
     pub fn initDoorsAndLevers(self: *@This(), allocator: std.mem.Allocator) !void {
@@ -155,6 +173,7 @@ pub const Maze = struct {
 
                 try self.levers_to_doors.put(allocator, lever_location, door_location);
                 try self.doors_to_levers.put(allocator, door_location, lever_location);
+                self.randomizable_doors.appendAssumeCapacity(door_index);
                 self.cells[lever_index].lever = true;
                 break;
             }
@@ -165,20 +184,13 @@ pub const Maze = struct {
                 self.cells[door_index].east = false;
             }
         }
+    }
 
-        for (self.doors_to_levers.keys()) |door_location| {
-            const door_index = self.getIndex(door_location.x, door_location.y);
-
-            // Random chance to open the door
-
-            const open = self.rng.random().boolean();
-            if (self.cells[door_index].south_door) {
-                self.cells[door_index].south = open;
-            } else if (self.cells[door_index].east_door) {
-                self.cells[door_index].east = open;
-            } else {
-                unreachable; // Should not happen
-            }
+    pub fn update(self: *@This(), delta_time: f32) void {
+        self.duration += delta_time;
+        if (self.duration >= config.permutation_time_period) {
+            self.randomizeDoors();
+            self.duration = 0.0; // Reset the duration after randomizing doors
         }
     }
 
@@ -359,22 +371,26 @@ pub const Maze = struct {
         return result;
     }
 
-    pub fn flipLever(self: *@This(), location: math.Vec2(usize)) void {
+    pub fn flipLever(self: *@This(), location: math.Vec2(usize)) bool {
         const location_index = self.getIndex(location.x, location.y);
 
         if (!self.cells[location_index].lever) {
-            return;
+            return false;
         }
+        self.cells[location_index].lever = false;
         const door_location = self.levers_to_doors.get(location) orelse unreachable;
         const door_index = self.getIndex(door_location.x, door_location.y);
 
         if (self.cells[door_index].south_door) {
-            self.cells[door_index].south = !self.cells[door_index].south;
+            self.cells[door_index].south = false;
         } else if (self.cells[door_index].east_door) {
-            self.cells[door_index].east = !self.cells[door_index].east;
+            self.cells[door_index].east = false;
         } else {
             unreachable;
         }
+        const index = std.mem.indexOfScalar(usize, self.randomizable_doors.items, door_index) orelse return true;
+        _ = self.randomizable_doors.swapRemove(index);
+        return true;
     }
 
     pub fn print(self: *@This()) void {
@@ -409,5 +425,6 @@ pub const Maze = struct {
         allocator.free(self.cells);
         self.levers_to_doors.deinit(allocator);
         self.doors_to_levers.deinit(allocator);
+        self.randomizable_doors.deinit(allocator);
     }
 };

@@ -15,8 +15,11 @@ const Unexplored = packed struct(u8) {
 pub const LimitedMaze = struct {
     cells: []Cell,
     folks: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), Unexplored),
-    allocator: std.mem.Allocator,
     size: math.Vec2(usize),
+
+    doors_found: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), void),
+    levers_found: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), void),
+    allocator: std.mem.Allocator,
 
     pub fn getIndex(self: *@This(), x: usize, y: usize) usize {
         return y * self.size.x + x;
@@ -27,6 +30,8 @@ pub const LimitedMaze = struct {
             .cells = try allocator.alloc(Cell, size.x * size.y),
             .folks = .empty,
             .size = size,
+            .doors_found = .empty,
+            .levers_found = .empty,
             .allocator = allocator,
         };
 
@@ -37,6 +42,8 @@ pub const LimitedMaze = struct {
     pub fn deinit(self: *@This()) void {
         self.allocator.free(self.cells);
         self.folks.deinit(self.allocator);
+        self.doors_found.deinit(self.allocator);
+        self.levers_found.deinit(self.allocator);
     }
 
     pub inline fn getNeighboutInDirection(
@@ -136,8 +143,9 @@ pub const LimitedMaze = struct {
         environment: *maze.Maze,
         dir_location: ?math.Vec2(usize),
         direction: Direction,
-    ) !void {
-        var location: math.Vec2(usize) = dir_location orelse return;
+    ) !bool {
+        var location: math.Vec2(usize) = dir_location orelse return false;
+        var should_replan = false;
         while (true) {
             // TODO: Invalidation code
             const neighbours = environment.getNeighbours(location);
@@ -146,6 +154,16 @@ pub const LimitedMaze = struct {
             self.cells[index] = environment.cells[index];
             self.cells[index].path = false;
             self.cells[index].corner = false;
+
+            if (self.cells[index].lever) {
+                try self.levers_found.put(self.allocator, location, {});
+                should_replan = true;
+            }
+            // TODO: Has error when finding closed doors when facing north and west
+            if (self.cells[index].south_door or self.cells[index].east_door) {
+                try self.doors_found.put(self.allocator, location, {});
+                should_replan = true;
+            }
 
             if (getUnexplored(direction, neighbours)) |unexplored| {
                 try self.folks.put(self.allocator, location, unexplored);
@@ -158,34 +176,54 @@ pub const LimitedMaze = struct {
                 break;
             }
         }
+        return should_replan;
     }
 
     pub fn increaseVisibility(
         self: *@This(),
         environment: *maze.Maze,
         current_location: math.Vec2(usize),
-    ) !void {
+    ) !bool {
         const neighbours = environment.getNeighbours(current_location);
+        var should_replan: bool = false;
 
-        try self.increaseVisibilityInDirection(
+        should_replan = should_replan or try self.increaseVisibilityInDirection(
             environment,
             current_location,
             .East,
         );
-        try self.increaseVisibilityInDirection(
+        should_replan = should_replan or try self.increaseVisibilityInDirection(
             environment,
             current_location,
             .South,
         );
-        try self.increaseVisibilityInDirection(
+        should_replan = should_replan or try self.increaseVisibilityInDirection(
             environment,
             neighbours[2],
             .West,
         );
-        try self.increaseVisibilityInDirection(
+        should_replan = should_replan or try self.increaseVisibilityInDirection(
             environment,
             neighbours[3],
             .North,
         );
+        return should_replan;
+    }
+
+    pub fn flipLever(self: *@This(), environment: *maze.Maze, location: math.Vec2(usize)) !void {
+        if (!environment.flipLever(location)) {
+            return;
+        }
+        const door_location = environment.levers_to_doors.get(location) orelse unreachable;
+        if (self.doors_found.contains(door_location)) {
+            const door_index = self.getIndex(door_location.x, door_location.y);
+
+            if (self.cells[door_index].south_door) {
+                self.cells[door_index].south = false;
+            } else if (self.cells[door_index].east_door) {
+                self.cells[door_index].east = false;
+            }
+        }
+        self.cells[self.getIndex(location.x, location.y)].lever = false;
     }
 };
