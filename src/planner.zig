@@ -38,7 +38,7 @@ pub fn plan(
                     defer path_to_target.?.deinit(allocator);
                     try actions.append(allocator, .{ .GoToTarget = target_location });
 
-                    std.debug.print("Pathing to target", .{});
+                    std.debug.print("Pathing to target\n", .{});
                     return;
                 }
             }

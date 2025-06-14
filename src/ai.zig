@@ -48,7 +48,7 @@ pub const AI = struct {
             .target = target,
             .target_cell = target_position_cell,
 
-            .environment = try .init(allocator, environment.size),
+            .environment = try .init(allocator, environment, target_position_cell),
 
             .corners = .empty,
             .current_corner = 0,
@@ -113,7 +113,7 @@ pub const AI = struct {
             environment,
             self.cell_position,
         );
-        self.environment.visitCell(self.cell_position);
+        try self.environment.visitCell(self.cell_position);
         if (try self.environment.flipLever(environment, self.cell_position)) {
             should_replan = true;
         }
@@ -205,6 +205,7 @@ pub const AI = struct {
                         }
                     }
 
+                    try p.append(self.environment.allocator, self.cell_position);
                     try path.findCorners(
                         self.environment.allocator,
                         p.items,

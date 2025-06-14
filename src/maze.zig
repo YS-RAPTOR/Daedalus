@@ -382,8 +382,6 @@ pub const Maze = struct {
         }
         const index = std.mem.indexOfScalar(usize, self.randomizable_doors.items, door_index) orelse return true;
         _ = self.randomizable_doors.swapRemove(index);
-        _ = self.doors_to_levers.swapRemove(door_location);
-        _ = self.levers_to_doors.swapRemove(location);
         return true;
     }
 

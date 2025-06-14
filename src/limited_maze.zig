@@ -15,7 +15,9 @@ const Unexplored = packed struct(u8) {
 pub const LimitedMaze = struct {
     cells: []Cell,
     unexplored: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), Unexplored),
+    explored: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), void),
     size: math.Vec2(usize),
+    target: math.Vec2(usize),
 
     doors_found: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), void),
     levers_found: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), void),
@@ -25,14 +27,20 @@ pub const LimitedMaze = struct {
         return y * self.size.x + x;
     }
 
-    pub fn init(allocator: std.mem.Allocator, size: math.Vec2(usize)) !@This() {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        environment: *maze.Maze,
+        target: math.Vec2(usize),
+    ) !@This() {
         const self: @This() = .{
-            .cells = try allocator.alloc(Cell, size.x * size.y),
+            .cells = try allocator.alloc(Cell, environment.size.x * environment.size.y),
             .unexplored = .empty,
-            .size = size,
+            .explored = .empty,
+            .size = environment.size,
             .doors_found = .empty,
             .levers_found = .empty,
             .allocator = allocator,
+            .target = target,
         };
 
         @memset(self.cells, .Walled);
@@ -42,6 +50,7 @@ pub const LimitedMaze = struct {
     pub fn deinit(self: *@This()) void {
         self.allocator.free(self.cells);
         self.unexplored.deinit(self.allocator);
+        self.explored.deinit(self.allocator);
         self.doors_found.deinit(self.allocator);
         self.levers_found.deinit(self.allocator);
     }
@@ -179,10 +188,15 @@ pub const LimitedMaze = struct {
             //      Door state changes from previously explored state.
             //      Found a lever.
             //      Found a door.
+            //      Found the target.
 
             const neighbours = environment.getNeighbours(location);
 
             const index = self.getIndex(location.x, location.y);
+
+            if (!self.cells[index].explored and location.equals(self.target)) {
+                should_replan = true;
+            }
 
             if (self.cells[index].explored) {
                 if (self.cells[index].south != environment.cells[index].south or
@@ -191,8 +205,6 @@ pub const LimitedMaze = struct {
                     should_replan = true;
                 }
             }
-
-            const was_explored = self.cells[index].explored;
 
             self.cells[index].south = environment.cells[index].south;
             self.cells[index].east = environment.cells[index].east;
@@ -216,7 +228,7 @@ pub const LimitedMaze = struct {
             }
 
             if (getUnexplored(direction, neighbours)) |unexplored| {
-                if (!was_explored) {
+                if (!self.explored.contains(location) and !self.unexplored.contains(location)) {
                     try self.unexplored.put(self.allocator, location, unexplored);
                     self.cells[index].path = true;
                 }
@@ -337,11 +349,12 @@ pub const LimitedMaze = struct {
         return known_door_removed;
     }
 
-    pub fn visitCell(self: *@This(), location: math.Vec2(usize)) void {
+    pub fn visitCell(self: *@This(), location: math.Vec2(usize)) !void {
         const index = self.getIndex(location.x, location.y);
         self.cells[index].path = false;
         self.cells[index].corner = false;
-        _ = self.unexplored.swapRemove(location);
+        const explored = self.unexplored.fetchSwapRemove(location) orelse return;
+        try self.explored.put(self.allocator, explored.key, {});
     }
 
     pub inline fn convert(self: *@This()) maze.Maze {
