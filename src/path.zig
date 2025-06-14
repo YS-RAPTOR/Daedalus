@@ -133,14 +133,15 @@ pub const Corner = struct {
     location: math.Vec2(usize),
 };
 
-pub fn findCorners(allocator: std.mem.Allocator, path: []const math.Vec2(usize)) !std.ArrayListUnmanaged(Corner) {
-    std.debug.assert(path.len >= 2); // Path must have at least two points
+pub fn findCorners(allocator: std.mem.Allocator, path: []const math.Vec2(usize), corners: *std.ArrayListUnmanaged(Corner)) !void {
+    if (path.len < 2) {
+        return;
+    }
 
     var point0: math.Vec2(isize) = path[0].cast(isize);
     var point1: math.Vec2(isize) = path[1].cast(isize);
 
     var direction: math.Vec2(i8) = point0.subtract(point1).cast(i8);
-    var corners: std.ArrayListUnmanaged(Corner) = .empty;
 
     for (0..path.len - 1) |i| {
         point0 = path[i].cast(isize);
@@ -158,5 +159,5 @@ pub fn findCorners(allocator: std.mem.Allocator, path: []const math.Vec2(usize))
             direction = next_direction;
         }
     }
-    return corners;
+    return;
 }

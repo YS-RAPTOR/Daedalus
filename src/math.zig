@@ -116,6 +116,13 @@ pub fn Vec2(T: type) type {
             return self.x == other.x and self.y == other.y;
         }
 
+        pub inline fn floor(self: @This()) Vec2(T) {
+            return .{
+                .x = @floor(self.x),
+                .y = @floor(self.y),
+            };
+        }
+
         pub inline fn cast(self: @This(), C: type) Vec2(C) {
             const self_info = @typeInfo(T);
             const other_info = @typeInfo(C);

@@ -113,26 +113,16 @@ pub const Maze = struct {
             if (self.cells[door_index].south_door or self.cells[door_index].east_door) {
                 continue;
             }
+            var prev_south: bool = false;
+            var prev_east: bool = false;
 
-            if (self.cells[door_index].south and self.cells[door_index].east) {
-                continue; // No door can be placed here if no empty wall is available
-            }
-
-            // Place a door at the location and close it
-            if (!self.cells[door_index].south and !self.cells[door_index].east) {
-                const r = self.rng.random().boolean();
-                if (r) {
-                    self.cells[door_index].south_door = true;
-                    self.cells[door_index].south = true;
-                } else {
-                    self.cells[door_index].east_door = true;
-                    self.cells[door_index].east = true;
-                }
-            } else if (!self.cells[door_index].south) {
+            if (self.rng.random().boolean()) {
                 self.cells[door_index].south_door = true;
+                prev_south = self.cells[door_index].south;
                 self.cells[door_index].south = true;
-            } else if (!self.cells[door_index].east) {
+            } else {
                 self.cells[door_index].east_door = true;
+                prev_east = self.cells[door_index].east;
                 self.cells[door_index].east = true;
             }
             @memset(visited, 0);
@@ -146,10 +136,10 @@ pub const Maze = struct {
 
             if (count < minimum_coverage or count > maximum_coverage) {
                 if (self.cells[door_index].south_door) {
-                    self.cells[door_index].south = false;
+                    self.cells[door_index].south = prev_south;
                     self.cells[door_index].south_door = false;
                 } else if (self.cells[door_index].east_door) {
-                    self.cells[door_index].east = false;
+                    self.cells[door_index].east = prev_east;
                     self.cells[door_index].east_door = false;
                 }
                 continue; // Not enough coverage, try again

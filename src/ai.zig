@@ -5,6 +5,7 @@ const maze = @import("maze.zig");
 const config = @import("config.zig").config;
 const Entity = @import("entity.zig").Entity;
 const limited_maze = @import("limited_maze.zig");
+const planner = @import("planner.zig");
 
 pub const AI = struct {
     cell_position: math.Vec2(usize),
@@ -16,9 +17,15 @@ pub const AI = struct {
     dead: bool = false,
     win: bool = false,
     target: math.Vec2(f32),
+    target_cell: math.Vec2(usize),
 
     corners: std.ArrayListUnmanaged(path.Corner),
     current_corner: usize,
+
+    sub_target: ?math.Vec2(f32),
+
+    actions: std.ArrayListUnmanaged(planner.Action),
+    current_action: ?planner.Action,
 
     environment: limited_maze.LimitedMaze,
 
@@ -32,27 +39,34 @@ pub const AI = struct {
         const target = target_position_cell.cast(f32).add(.init(0.5, 0.5));
 
         return .{
-            .cell_position = starting_position_cell,
             .force = .Zero,
             .acceleration = .Zero,
             .velocity = .Zero,
             .position = position,
+            .cell_position = starting_position_cell,
+
             .target = target,
-            // TODO: Fixed after adding goap
+            .target_cell = target_position_cell,
+
+            .environment = try .init(allocator, environment.size),
+
             .corners = .empty,
             .current_corner = 0,
-            .environment = try .init(allocator, environment.size),
+            .sub_target = null,
+            .actions = .empty,
+            .current_action = null,
         };
     }
 
     pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
         self.corners.deinit(allocator);
         self.environment.deinit();
+        self.actions.deinit(allocator);
     }
 
     pub fn setDirection(self: *@This()) void {
         if (self.current_corner == 0) {
-            self.force = self.target.subtract(self.position).normalize();
+            self.force = self.sub_target.?.subtract(self.position).normalize();
             return;
         }
 
@@ -90,19 +104,143 @@ pub const AI = struct {
             return;
         }
 
+        // Update Environment
         self.cell_position = .{
             .x = @intFromFloat(@trunc(self.position.x)),
             .y = @intFromFloat(@trunc(self.position.y)),
         };
-        const should_replan = try self.environment.increaseVisibility(
+        var should_replan = try self.environment.increaseVisibility(
             environment,
             self.cell_position,
         );
         self.environment.visitCell(self.cell_position);
+        if (try self.environment.flipLever(environment, self.cell_position)) {
+            should_replan = true;
+        }
 
-        _ = should_replan;
-        // self.setDirection();
-        try self.environment.flipLever(environment, self.cell_position);
+        // Check if the action is completed
+        if (self.current_action) |current_action| {
+            switch (current_action) {
+                .GoToTarget => |target| {
+                    if (self.cell_position.equals(target)) {
+                        self.current_action = self.actions.pop();
+                        self.corners.clearRetainingCapacity();
+                        self.current_corner = 0;
+                        self.sub_target = null;
+                    }
+                },
+                .Explore => {
+                    if (self.sub_target) |sub_target| {
+                        if (self.cell_position.equals(sub_target.floor().cast(usize))) {
+                            self.corners.clearRetainingCapacity();
+                            self.current_corner = 0;
+                            self.sub_target = null;
+                        }
+                    }
+                },
+            }
+        }
+
+        // Check if we need to replan
+        if (self.current_action == null or should_replan) {
+            try planner.plan(
+                self.environment.allocator,
+                &self.environment,
+                self.cell_position,
+                self.target_cell,
+                &self.actions,
+            );
+            self.corners.clearRetainingCapacity();
+            self.current_corner = 0;
+            self.sub_target = null;
+            self.current_action = self.actions.pop();
+        }
+        // Perform Action
+        var converted_environment = self.environment.convert();
+        switch (self.current_action.?) {
+            .GoToTarget => |target| {
+                if (self.sub_target == null) {
+                    self.sub_target = target.cast(f32).add(.init(0.5, 0.5));
+                    var path_to_target = try path.aStar(
+                        self.environment.allocator,
+                        &converted_environment,
+                        self.cell_position,
+                        target,
+                        null,
+                    );
+                    try path_to_target.append(self.environment.allocator, self.cell_position);
+                    defer path_to_target.deinit(self.environment.allocator);
+
+                    try path.findCorners(
+                        self.environment.allocator,
+                        path_to_target.items,
+                        &self.corners,
+                    );
+                    self.current_corner = self.corners.items.len;
+                }
+            },
+            .Explore => {
+                if (self.sub_target == null) {
+                    var target = self.cell_position;
+                    var steps: usize = 10_000_000;
+                    var p: std.ArrayListUnmanaged(math.Vec2(usize)) = .empty;
+                    defer p.deinit(self.environment.allocator);
+
+                    for (self.environment.unexplored.keys()) |unexplored_cell| {
+                        var path_to_unexplored = path.aStar(
+                            self.environment.allocator,
+                            &converted_environment,
+                            self.cell_position,
+                            unexplored_cell,
+                            null,
+                        ) catch continue;
+
+                        if (path_to_unexplored.items.len < steps) {
+                            p.deinit(self.environment.allocator);
+                            target = unexplored_cell;
+                            steps = path_to_unexplored.items.len;
+                            p = path_to_unexplored;
+                        } else {
+                            path_to_unexplored.deinit(self.environment.allocator);
+                        }
+                    }
+
+                    try path.findCorners(
+                        self.environment.allocator,
+                        p.items,
+                        &self.corners,
+                    );
+
+                    if (self.environment.unexplored.get(target)) |unexplored| {
+                        if (unexplored.east) {
+                            try self.corners.insert(self.environment.allocator, 0, .{
+                                .location = target,
+                                .direction = .init(1, 0),
+                            });
+                        } else if (unexplored.south) {
+                            try self.corners.insert(self.environment.allocator, 0, .{
+                                .location = target,
+                                .direction = .init(0, 1),
+                            });
+                        } else if (unexplored.west) {
+                            try self.corners.insert(self.environment.allocator, 0, .{
+                                .location = target,
+                                .direction = .init(-1, 0),
+                            });
+                        } else {
+                            try self.corners.insert(self.environment.allocator, 0, .{
+                                .location = target,
+                                .direction = .init(0, -1),
+                            });
+                        }
+                    }
+                    self.current_corner = self.corners.items.len;
+                    self.sub_target = target.cast(f32).add(.init(0.5, 0.5));
+                }
+            },
+        }
+
+        self.setDirection();
 
         // Update Player Position and Velocity
         if (self.velocity.length() > 0) {

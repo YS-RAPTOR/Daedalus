@@ -30,6 +30,9 @@ const Config = struct {
     corner_lerp_distance: f32 = 0.5,
     slow_down_distance: f32 = 3,
     slow_down_speed: f32 = 0.5,
+
+    // Planner
+    planner: enum(u1) { GOAP, BehaviorTree } = .BehaviorTree,
 };
 
 pub const config: Config = .{};

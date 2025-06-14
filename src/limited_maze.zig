@@ -219,7 +219,6 @@ pub const LimitedMaze = struct {
                 if (!was_explored) {
                     try self.unexplored.put(self.allocator, location, unexplored);
                     self.cells[index].path = true;
-                    std.debug.print("Added location {} to unexplored\n", .{location});
                 }
             }
 
@@ -328,6 +327,9 @@ pub const LimitedMaze = struct {
                 self.cells[door_index].east_door = false;
             }
             _ = self.doors_found.swapRemove(door_location);
+
+            try self.unexplored.put(self.allocator, door_location, .{});
+            self.cells[door_index].path = true;
         }
         self.cells[self.getIndex(location.x, location.y)].lever = false;
         _ = self.levers_found.swapRemove(location);
@@ -340,5 +342,17 @@ pub const LimitedMaze = struct {
         self.cells[index].path = false;
         self.cells[index].corner = false;
         _ = self.unexplored.swapRemove(location);
+    }
+
+    pub inline fn convert(self: *@This()) maze.Maze {
+        return .{
+            .cells = self.cells,
+            .size = self.size,
+            .rng = undefined,
+            .doors_to_levers = .empty,
+            .levers_to_doors = .empty,
+            .randomizable_doors = .empty,
+            .duration = 0,
+        };
     }
 };

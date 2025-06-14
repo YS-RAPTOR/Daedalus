@@ -7,9 +7,10 @@
 - [x] Doors and Levers
 - [x] Dynamic maze shifting
 - [x] Environmental Change Detection
-- [ ] Explore routine
+- [x] Explore routine
+- [x] Behavior Trees
+- [ ] Full maze snapshot
 - [ ] GOAP
-- [ ] Behavior Trees
 
 ## Optional
 
