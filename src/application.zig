@@ -47,6 +47,7 @@ pub const Application = struct {
 
     game_data: struct {
         paused: bool = true,
+        limited_visibility: bool = false,
         cell_size: f32,
         ai_player: ai.AI,
         drag: struct {
@@ -269,7 +270,7 @@ pub const Application = struct {
                 }
             }
 
-            self.update(delta_time);
+            try self.update(delta_time);
             try self.render();
         }
     }
@@ -291,6 +292,10 @@ pub const Application = struct {
             sdl.SDLK_SPACE => {
                 // Toggle pause state
                 self.game_data.paused = !self.game_data.paused;
+            },
+            sdl.SDLK_C => {
+                // Toggle limited visibility
+                self.game_data.limited_visibility = !self.game_data.limited_visibility;
             },
             else => {},
         }
@@ -337,7 +342,7 @@ pub const Application = struct {
         self.uniforms.offset.y = towards.y + (self.uniforms.offset.y - towards.y) * scale_factor;
     }
 
-    fn update(self: *@This(), delta_time: f32) void {
+    fn update(self: *@This(), delta_time: f32) !void {
         self.uniforms.time += delta_time;
 
         self.game_data.cell_size = @min(
@@ -358,7 +363,7 @@ pub const Application = struct {
             return;
         }
 
-        self.game_data.ai_player.update(delta_time, &self.maze);
+        try self.game_data.ai_player.update(delta_time, &self.maze);
 
         const entities = self.entities[0..config.max_entities];
         var offset: usize = 0;
@@ -390,11 +395,17 @@ pub const Application = struct {
                 defer self.maze.updated = false;
 
                 // Copy Data to transfer buffer
-                if (self.maze.updated) {
+                if (self.game_data.limited_visibility) {
+                    try self.copyToTransferBuffer(
+                        self.maze_transfer,
+                        @ptrCast(self.game_data.ai_player.environment.cells.items),
+                        true,
+                    );
+                } else {
                     try self.copyToTransferBuffer(
                         self.maze_transfer,
                         @ptrCast(self.maze.cells.items),
-                        false,
+                        true,
                     );
                 }
                 try self.copyToTransferBuffer(
@@ -409,21 +420,19 @@ pub const Application = struct {
                 defer sdl.SDL_EndGPUCopyPass(copy_pass);
 
                 // Copy Data to GPU Buffers
-                if (self.maze.updated) {
-                    sdl.SDL_UploadToGPUBuffer(
-                        copy_pass,
-                        &.{
-                            .offset = 0,
-                            .transfer_buffer = self.maze_transfer,
-                        },
-                        &.{
-                            .buffer = self.maze_buffer,
-                            .size = @as(u32, @intCast(self.maze.cells.items.len)) * @sizeOf(Cell),
-                            .offset = 0,
-                        },
-                        false,
-                    );
-                }
+                sdl.SDL_UploadToGPUBuffer(
+                    copy_pass,
+                    &.{
+                        .offset = 0,
+                        .transfer_buffer = self.maze_transfer,
+                    },
+                    &.{
+                        .buffer = self.maze_buffer,
+                        .size = @as(u32, @intCast(self.maze.cells.items.len)) * @sizeOf(Cell),
+                        .offset = 0,
+                    },
+                    true,
+                );
                 sdl.SDL_UploadToGPUBuffer(
                     copy_pass,
                     &.{

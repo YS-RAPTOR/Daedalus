@@ -3,7 +3,8 @@
 ## TODOs
 
 - [x] Remove energy system
-- [ ] Environmental Memory and limited visibility
+- [x] Environmental Memory and limited visibility
+- [ ] Explore routine
 - [ ] Dynamic maze shifting
 - [ ] Environmental Invalidation
 - [ ] Doors and Levers

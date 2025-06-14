@@ -4,6 +4,7 @@ const path = @import("path.zig");
 const maze = @import("maze.zig");
 const config = @import("config.zig").config;
 const Entity = @import("entity.zig").Entity;
+const limited_maze = @import("limited_maze.zig");
 
 pub const AI = struct {
     cell_position: math.Vec2(usize),
@@ -18,6 +19,8 @@ pub const AI = struct {
 
     corners: std.ArrayListUnmanaged(path.Corner),
     current_corner: usize,
+
+    environment: limited_maze.LimitedMaze,
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -65,11 +68,13 @@ pub const AI = struct {
             .corners = corners,
             .target = target,
             .current_corner = corners.items.len,
+            .environment = try .init(allocator, environment.size),
         };
     }
 
     pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
         self.corners.deinit(allocator);
+        self.environment.deinit(allocator);
     }
 
     pub fn setDirection(self: *@This()) void {
@@ -103,7 +108,7 @@ pub const AI = struct {
         }
     }
 
-    pub fn update(self: *@This(), delta_time: f32, environment: *maze.Maze) void {
+    pub fn update(self: *@This(), delta_time: f32, environment: *maze.Maze) !void {
         if (self.dead) {
             return;
         }
@@ -112,12 +117,15 @@ pub const AI = struct {
             return;
         }
 
-        _ = environment; // Unused variable, but might be used in the future
         self.setDirection();
         self.cell_position = .{
             .x = @intFromFloat(@trunc(self.position.x)),
             .y = @intFromFloat(@trunc(self.position.y)),
         };
+        try self.environment.increaseVisibility(
+            environment,
+            self.cell_position,
+        );
 
         // Update Player Position and Velocity
         if (self.velocity.length() > 0) {
