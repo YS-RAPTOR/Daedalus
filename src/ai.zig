@@ -28,34 +28,6 @@ pub const AI = struct {
         target_position_cell: math.Vec2(usize),
         environment: *maze.Maze,
     ) !@This() {
-        var path_to_target = try path.aStar(
-            allocator,
-            environment,
-            starting_position_cell,
-            target_position_cell,
-            null,
-        );
-        try path_to_target.append(allocator, starting_position_cell);
-        defer path_to_target.deinit(allocator);
-
-        // For Debug purposes
-        for (path_to_target.items) |pos| {
-            const index = environment.getIndex(pos.x, pos.y);
-            environment.cells.items[index].path = true;
-        }
-
-        var corners = try path.findCorners(
-            allocator,
-            path_to_target.items,
-        );
-        errdefer corners.deinit(allocator);
-
-        // For Debug purposes
-        for (corners.items) |corner| {
-            const index = environment.getIndex(corner.location.x, corner.location.y);
-            environment.cells.items[index].corner = true;
-        }
-
         const position = starting_position_cell.cast(f32).add(.init(0.5, 0.5));
         const target = target_position_cell.cast(f32).add(.init(0.5, 0.5));
 
@@ -65,16 +37,17 @@ pub const AI = struct {
             .acceleration = .Zero,
             .velocity = .Zero,
             .position = position,
-            .corners = corners,
             .target = target,
-            .current_corner = corners.items.len,
+            // TODO: Fixed after adding goap
+            .corners = .empty,
+            .current_corner = 0,
             .environment = try .init(allocator, environment.size),
         };
     }
 
     pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
         self.corners.deinit(allocator);
-        self.environment.deinit(allocator);
+        self.environment.deinit();
     }
 
     pub fn setDirection(self: *@This()) void {
@@ -117,7 +90,6 @@ pub const AI = struct {
             return;
         }
 
-        self.setDirection();
         self.cell_position = .{
             .x = @intFromFloat(@trunc(self.position.x)),
             .y = @intFromFloat(@trunc(self.position.y)),
@@ -126,6 +98,8 @@ pub const AI = struct {
             environment,
             self.cell_position,
         );
+
+        // self.setDirection();
 
         // Update Player Position and Velocity
         if (self.velocity.length() > 0) {

@@ -46,7 +46,7 @@ static const float4[] entity_color = {
     float4(0.882, 0.114, 0.282, 1.0), // #E11D48
 };
 
-static const float4 lever_color = float4(0.988, 0.8, 0.149, 1.0); // #FDE047
+static const float3 door_lever_color = float3(0.988, 0.8, 0.149); // #FDE047
 static const float3 path_color = float3 (0.278, 0.333, 0.412); // #475569
 static const float3 corner_color_offset = float3(0.5, 0.5, 0.5); // #888888
 static const float3 highlight_color = float3(0.9098, 0.4745, 0.9765); // #e879f9
@@ -71,7 +71,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     let index = cell_index.y * maze_size + cell_index.x;
 
     var color = false;
+    var is_door = false;
     let walls = getWalls(cell_index);
+    let doors = getDoors(cell_index);
     let cell_coord = int2(floor(offset_coord)) % cell_size;
 
     let cell = maze_buffer[getIndex(cell_index)];
@@ -86,6 +88,11 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     color |= cell_coord.y >= cell_size - wall_thickness && walls.z; // South wall
     color |= cell_coord.x < wall_thickness && walls.w; // West wall
 
+    is_door |= cell_coord.y < wall_thickness && walls.x && doors.x; // North Door
+    is_door |= cell_coord.x >= cell_size - wall_thickness && walls.y && doors.y; // East Door
+    is_door |= cell_coord.y >= cell_size - wall_thickness && walls.z && doors.z; // South Door
+    is_door |= cell_coord.x < wall_thickness && walls.w && doors.w; // West Door
+
     OutImage[int2(coord)] = float4(
         (path_color * float3(is_path) + corner_color_offset * float3(is_corner)),
         1.0f,
@@ -95,8 +102,19 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         1.0f,
     );
 
-    // Draw Entities
     let uv = offset_coord / maze_size_px;
+    if (has_lever) {
+        OutImage[int2(coord)] = DrawSmoothCircle(
+            uv,
+            float2(cell_index) * cell_size / maze_size_px + 0.5f * cell_size / maze_size_px,
+            float(lever_radius) / maze_size_px,
+            0.003f,
+            float4(door_lever_color, 1.0),
+            OutImage[int2(coord)],
+        );
+    }
+
+    // Draw Entities
     for (uint i = 0; i < entities.getCount(); ++i) {
         let entity = entities[i];
         if(entity.type == EntityType::None) continue;
@@ -110,20 +128,13 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         );
     }
 
-
-    if (has_lever) {
-        OutImage[int2(coord)] = DrawSmoothCircle(
-            uv,
-            float2(cell_index) * cell_size / maze_size_px + 0.5f * cell_size / maze_size_px,
-            float(lever_radius) / maze_size_px,
-            0.003f,
-            lever_color,
-            OutImage[int2(coord)],
-        );
-    }
-
     OutImage[int2(coord)] = float4(
         float3(color) + float(!color) * OutImage[int2(coord)].xyz,
+        1.0f,
+    );
+
+    OutImage[int2(coord)] = float4(
+        float3(is_door) * door_lever_color + float(!is_door) * OutImage[int2(coord)].xyz,
         1.0f,
     ) * float(!out_of_bounds);
 }
@@ -163,5 +174,23 @@ bool4 getWalls(int2 cell_index) {
         let left_cell = maze_buffer[getIndex(left_cell_index)];
         result.w = (left_cell.bitAnd(Cell.East)) != 0; // East wall is the east wall of the cell to the right
     }
+    return result;
+}
+
+bool4 getDoors(int2 cell_index) {
+    var result = bool4(false);
+
+    let cell = maze_buffer[getIndex(cell_index)];
+    result.y = (cell.bitAnd(Cell.EastDoor)) != 0; // East Door
+    result.z = (cell.bitAnd(Cell.SouthDoor)) != 0; // South Door
+
+    // NOTE: No Doors at the edges
+    let top_cell_index = cell_index - int2(0, 1);
+    let top_cell = maze_buffer[getIndex(top_cell_index)];
+    result.x = (top_cell.bitAnd(Cell.SouthDoor)) != 0; // North Door is the south Door of the cell above
+
+    let left_cell_index = cell_index - int2(1, 0);
+    let left_cell = maze_buffer[getIndex(left_cell_index)];
+    result.w = (left_cell.bitAnd(Cell.EastDoor)) != 0; // East Door is the east Door of the cell to the right
     return result;
 }

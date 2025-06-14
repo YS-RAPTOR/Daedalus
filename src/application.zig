@@ -121,8 +121,6 @@ pub const Application = struct {
             config.seed,
             .{ .x = config.maze_size, .y = config.maze_size },
         );
-        try self.maze.eller(self.allocator);
-        self.maze.initLocations(config.no_of_doors);
         errdefer self.maze.deinit(self.allocator);
 
         // Create the maze buffer and transfer buffer
@@ -130,14 +128,14 @@ pub const Application = struct {
             self.device,
             &.{
                 .usage = sdl.SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ,
-                .size = @as(u32, @intCast(self.maze.cells.items.len)) * @sizeOf(Cell),
+                .size = @as(u32, @intCast(self.maze.cells.len)) * @sizeOf(Cell),
             },
         ) orelse try check(false, error.CouldNotCreateMazeBuffer);
         errdefer sdl.SDL_ReleaseGPUBuffer(self.device, self.maze_buffer);
 
         self.maze_transfer = sdl.SDL_CreateGPUTransferBuffer(self.device, &.{
             .usage = sdl.SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-            .size = @as(u32, @intCast(self.maze.cells.items.len)) * @sizeOf(Cell),
+            .size = @as(u32, @intCast(self.maze.cells.len)) * @sizeOf(Cell),
         }) orelse try check(false, error.CouldNotCreateMazeTransferBuffer);
         errdefer sdl.SDL_ReleaseGPUTransferBuffer(self.device, self.maze_transfer);
 
@@ -277,18 +275,18 @@ pub const Application = struct {
 
     fn handleKeyboardInput(self: *@This(), keycode: u32) void {
         switch (keycode) {
-            // sdl.SDLK_W, sdl.SDLK_UP => {
-            //     self.game_data.player.force.y = -1.0;
-            // },
-            // sdl.SDLK_S, sdl.SDLK_DOWN => {
-            //     self.game_data.player.force.y = 1.0;
-            // },
-            // sdl.SDLK_A, sdl.SDLK_LEFT => {
-            //     self.game_data.player.force.x = -1.0;
-            // },
-            // sdl.SDLK_D, sdl.SDLK_RIGHT => {
-            //     self.game_data.player.force.x = 1.0;
-            // },
+            sdl.SDLK_W, sdl.SDLK_UP => {
+                self.game_data.ai_player.force.y = -10.0;
+            },
+            sdl.SDLK_S, sdl.SDLK_DOWN => {
+                self.game_data.ai_player.force.y = 10.0;
+            },
+            sdl.SDLK_A, sdl.SDLK_LEFT => {
+                self.game_data.ai_player.force.x = -10.0;
+            },
+            sdl.SDLK_D, sdl.SDLK_RIGHT => {
+                self.game_data.ai_player.force.x = 10.0;
+            },
             sdl.SDLK_SPACE => {
                 // Toggle pause state
                 self.game_data.paused = !self.game_data.paused;
@@ -296,6 +294,10 @@ pub const Application = struct {
             sdl.SDLK_C => {
                 // Toggle limited visibility
                 self.game_data.limited_visibility = !self.game_data.limited_visibility;
+            },
+            sdl.SDLK_E => {
+                // Flick lever
+                self.maze.flipLever(self.game_data.ai_player.cell_position);
             },
             else => {},
         }
@@ -392,19 +394,17 @@ pub const Application = struct {
         if (texture) |tex| {
             // Copy Pass
             {
-                defer self.maze.updated = false;
-
                 // Copy Data to transfer buffer
                 if (self.game_data.limited_visibility) {
                     try self.copyToTransferBuffer(
                         self.maze_transfer,
-                        @ptrCast(self.game_data.ai_player.environment.cells.items),
+                        @ptrCast(self.game_data.ai_player.environment.cells),
                         true,
                     );
                 } else {
                     try self.copyToTransferBuffer(
                         self.maze_transfer,
-                        @ptrCast(self.maze.cells.items),
+                        @ptrCast(self.maze.cells),
                         true,
                     );
                 }
@@ -428,7 +428,7 @@ pub const Application = struct {
                     },
                     &.{
                         .buffer = self.maze_buffer,
-                        .size = @as(u32, @intCast(self.maze.cells.items.len)) * @sizeOf(Cell),
+                        .size = @as(u32, @intCast(self.maze.cells.len)) * @sizeOf(Cell),
                         .offset = 0,
                     },
                     true,

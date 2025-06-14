@@ -1,6 +1,7 @@
 const std = @import("std");
 const math = @import("math.zig");
 const random = std.Random;
+const config = @import("config.zig").config;
 
 pub const Cell = packed struct(u8) {
     south: bool,
@@ -10,7 +11,7 @@ pub const Cell = packed struct(u8) {
     east_door: bool,
     path: bool,
     corner: bool,
-    padding: u1 = 0,
+    invalid: bool,
 
     pub const Open: @This() = .{
         .south = false,
@@ -20,6 +21,7 @@ pub const Cell = packed struct(u8) {
         .east_door = false,
         .path = false,
         .corner = false,
+        .invalid = false,
     };
 
     pub const Walled: @This() = .{
@@ -30,35 +32,187 @@ pub const Cell = packed struct(u8) {
         .east_door = false,
         .path = false,
         .corner = false,
+        .invalid = false,
     };
 };
 
 pub const Maze = struct {
-    cells: std.ArrayListUnmanaged(Cell),
-    // TODO: Add something like lever control to map levers and doors
+    cells: []Cell,
+    // permutations: [no_of_doors * 2][]Cell,
     size: math.Vec2(usize),
     rng: random.Xoshiro256,
-    updated: bool = false,
+    levers_to_doors: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), math.Vec2(usize)),
+    doors_to_levers: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), math.Vec2(usize)),
 
     pub fn getIndex(self: *@This(), x: usize, y: usize) usize {
         return y * self.size.x + x;
     }
 
     pub fn init(allocator: std.mem.Allocator, seed: u64, size: math.Vec2(usize)) !@This() {
-        var cells: std.ArrayListUnmanaged(Cell) = .empty;
-        try cells.appendNTimes(allocator, Cell.Walled, size.x * size.y);
-
-        return .{
+        const cells = try allocator.alloc(Cell, size.x * size.y);
+        @memset(cells, Cell.Walled);
+        var self: @This() = .{
             .cells = cells,
             .size = size,
             .rng = random.DefaultPrng.init(seed),
+            .levers_to_doors = .empty,
+            .doors_to_levers = .empty,
         };
+
+        try self.eller(allocator);
+        try self.initDoorsAndLevers(allocator);
+        return self;
     }
 
-    pub fn initLocations(self: *@This(), no_of_doors: usize) void {
-        // TODO: Initialize doors, levers, and other locations in the maze
-        _ = self;
-        _ = no_of_doors;
+    pub fn initDoorsAndLevers(self: *@This(), allocator: std.mem.Allocator) !void {
+        const visited: []u8 = try allocator.alloc(u8, self.size.x * self.size.y);
+        defer allocator.free(visited);
+
+        const size_float = self.size.cast(f32);
+        const minimum_coverage: usize = @intFromFloat(config.door_coverage_percentage * size_float.x * size_float.y);
+        const maximum_coverage: usize = (self.size.x * self.size.y) - minimum_coverage;
+
+        var doors_created: usize = 0;
+        while (true) {
+            if (doors_created >= config.no_of_doors) {
+                break; // Stop when we have created enough doors
+            }
+
+            const door_location: math.Vec2(usize) = .init(
+                self.rng.random().uintLessThan(usize, self.size.x),
+                self.rng.random().uintLessThan(usize, self.size.y),
+            );
+
+            // No doors at the edges
+            if (door_location.x == 0 or door_location.x == self.size.x - 1 or
+                door_location.y == 0 or door_location.y == self.size.y - 1)
+            {
+                continue;
+            }
+
+            const door_index = self.getIndex(door_location.x, door_location.y);
+
+            if (self.cells[door_index].south_door or self.cells[door_index].east_door) {
+                continue;
+            }
+
+            if (self.cells[door_index].south and self.cells[door_index].east) {
+                continue; // No door can be placed here if no empty wall is available
+            }
+
+            // Place a door at the location and close it
+            if (!self.cells[door_index].south and !self.cells[door_index].east) {
+                const r = self.rng.random().boolean();
+                if (r) {
+                    self.cells[door_index].south_door = true;
+                    self.cells[door_index].south = true;
+                } else {
+                    self.cells[door_index].east_door = true;
+                    self.cells[door_index].east = true;
+                }
+            } else if (!self.cells[door_index].south) {
+                self.cells[door_index].south_door = true;
+                self.cells[door_index].south = true;
+            } else if (!self.cells[door_index].east) {
+                self.cells[door_index].east_door = true;
+                self.cells[door_index].east = true;
+            }
+            @memset(visited, 0);
+            const found_target, const count = self.floodFill(
+                door_location,
+                1,
+                visited,
+                .init(0, 0),
+                0,
+            );
+
+            if (count < minimum_coverage or count > maximum_coverage) {
+                if (self.cells[door_index].south_door) {
+                    self.cells[door_index].south = false;
+                    self.cells[door_index].south_door = false;
+                } else if (self.cells[door_index].east_door) {
+                    self.cells[door_index].east = false;
+                    self.cells[door_index].east_door = false;
+                }
+                continue; // Not enough coverage, try again
+            }
+            doors_created += 1;
+
+            const id: u8 = @intFromBool(found_target);
+
+            while (true) {
+                const lever_location: math.Vec2(usize) = .init(
+                    self.rng.random().uintLessThan(usize, self.size.x),
+                    self.rng.random().uintLessThan(usize, self.size.y),
+                );
+                const lever_index = self.getIndex(lever_location.x, lever_location.y);
+                if (visited[lever_index] != id) {
+                    continue; // Lever must be placed on the reachable side
+                }
+                if (self.cells[lever_index].lever) {
+                    continue; // Lever already placed here
+                }
+
+                try self.levers_to_doors.put(allocator, lever_location, door_location);
+                try self.doors_to_levers.put(allocator, door_location, lever_location);
+                self.cells[lever_index].lever = true;
+                break;
+            }
+
+            if (self.cells[door_index].south_door) {
+                self.cells[door_index].south = false;
+            } else if (self.cells[door_index].east_door) {
+                self.cells[door_index].east = false;
+            }
+        }
+
+        for (self.doors_to_levers.keys()) |door_location| {
+            const door_index = self.getIndex(door_location.x, door_location.y);
+
+            // Random chance to open the door
+
+            const open = self.rng.random().boolean();
+            if (self.cells[door_index].south_door) {
+                self.cells[door_index].south = open;
+            } else if (self.cells[door_index].east_door) {
+                self.cells[door_index].east = open;
+            } else {
+                unreachable; // Should not happen
+            }
+        }
+    }
+
+    pub fn floodFill(
+        self: *@This(),
+        start_location: math.Vec2(usize),
+        id: u8,
+        visited: []u8,
+        target: math.Vec2(usize),
+        count: usize,
+    ) struct { bool, usize } {
+        var found_target = start_location.equals(target);
+        const index = self.getIndex(start_location.x, start_location.y);
+
+        if (visited[index] == id) {
+            return .{ found_target, count }; // Already visited
+        }
+        visited[index] = id;
+        var new_count = count + 1;
+
+        const neighbours = self.getNeighbours(start_location);
+        for (neighbours) |null_neighbour| {
+            if (null_neighbour) |neighbour| {
+                const ft, new_count = self.floodFill(
+                    neighbour,
+                    id,
+                    visited,
+                    target,
+                    new_count,
+                );
+                found_target = found_target or ft;
+            }
+        }
+        return .{ found_target, new_count };
     }
 
     fn extendDown(self: *@This(), id: usize, cells: []Cell, ids: []usize) void {
@@ -87,7 +241,6 @@ pub const Maze = struct {
     }
 
     pub fn eller(self: *@This(), allocator: std.mem.Allocator) !void {
-        self.updated = true;
         var current_set: std.ArrayListUnmanaged(usize) = try .initCapacity(allocator, self.size.x);
         defer current_set.deinit(allocator);
 
@@ -103,7 +256,7 @@ pub const Maze = struct {
 
             const row_start = self.getIndex(0, i);
             const row_end = self.getIndex(self.size.x, i);
-            const row = self.cells.items[row_start..row_end];
+            const row = self.cells[row_start..row_end];
 
             // Randomly join the sets
             for (
@@ -177,7 +330,7 @@ pub const Maze = struct {
     pub fn getNeighbours(self: *@This(), location: math.Vec2(usize)) [4]?math.Vec2(usize) {
         var result: [4]?math.Vec2(usize) = .{ null, null, null, null };
         const index = self.getIndex(location.x, location.y);
-        const cell = self.cells.items[index];
+        const cell = self.cells[index];
 
         if (!cell.east) {
             result[0] = .init(location.x + 1, location.y);
@@ -190,7 +343,7 @@ pub const Maze = struct {
         if (location.x > 0) {
             const left: math.Vec2(usize) = .init(location.x - 1, location.y);
             const left_index = self.getIndex(left.x, left.y);
-            if (!self.cells.items[left_index].east) {
+            if (!self.cells[left_index].east) {
                 result[2] = left;
             }
         }
@@ -198,12 +351,30 @@ pub const Maze = struct {
         if (location.y > 0) {
             const up: math.Vec2(usize) = .init(location.x, location.y - 1);
             const up_index = self.getIndex(up.x, up.y);
-            if (!self.cells.items[up_index].south) {
+            if (!self.cells[up_index].south) {
                 result[3] = up;
             }
         }
 
         return result;
+    }
+
+    pub fn flipLever(self: *@This(), location: math.Vec2(usize)) void {
+        const location_index = self.getIndex(location.x, location.y);
+
+        if (!self.cells[location_index].lever) {
+            return;
+        }
+        const door_location = self.levers_to_doors.get(location) orelse unreachable;
+        const door_index = self.getIndex(door_location.x, door_location.y);
+
+        if (self.cells[door_index].south_door) {
+            self.cells[door_index].south = !self.cells[door_index].south;
+        } else if (self.cells[door_index].east_door) {
+            self.cells[door_index].east = !self.cells[door_index].east;
+        } else {
+            unreachable;
+        }
     }
 
     pub fn print(self: *@This()) void {
@@ -235,6 +406,8 @@ pub const Maze = struct {
     }
 
     pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
-        self.cells.deinit(allocator);
+        allocator.free(self.cells);
+        self.levers_to_doors.deinit(allocator);
+        self.doors_to_levers.deinit(allocator);
     }
 };

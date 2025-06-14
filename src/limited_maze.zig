@@ -13,8 +13,9 @@ const Unexplored = packed struct(u8) {
 };
 
 pub const LimitedMaze = struct {
-    cells: std.ArrayListUnmanaged(Cell),
-    folks: std.AutoArrayHashMap(math.Vec2(usize), Unexplored),
+    cells: []Cell,
+    folks: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), Unexplored),
+    allocator: std.mem.Allocator,
     size: math.Vec2(usize),
 
     pub fn getIndex(self: *@This(), x: usize, y: usize) usize {
@@ -22,50 +23,63 @@ pub const LimitedMaze = struct {
     }
 
     pub fn init(allocator: std.mem.Allocator, size: math.Vec2(usize)) !@This() {
-        var self: @This() = .{
-            .cells = .empty,
-            .folks = .init(allocator),
+        const self: @This() = .{
+            .cells = try allocator.alloc(Cell, size.x * size.y),
+            .folks = .empty,
             .size = size,
+            .allocator = allocator,
         };
 
-        try self.cells.appendNTimes(allocator, .Walled, size.x * size.y);
+        @memset(self.cells, .Walled);
         return self;
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
-        self.cells.deinit(allocator);
-        self.folks.deinit();
+    pub fn deinit(self: *@This()) void {
+        self.allocator.free(self.cells);
+        self.folks.deinit(self.allocator);
+    }
+
+    pub inline fn getNeighboutInDirection(
+        self: *@This(),
+        location: math.Vec2(usize),
+        direction: Direction,
+    ) ?math.Vec2(usize) {
+        const index = self.getIndex(location.x, location.y);
+        const cell = self.cells.items[index];
+        switch (direction) {
+            .East => {
+                if (!cell.east) return .init(location.x + 1, location.y);
+            },
+            .South => {
+                if (!cell.south) return .init(location.x, location.y + 1);
+            },
+            .West => {
+                if (location.x > 0) {
+                    const left: math.Vec2(usize) = .init(location.x - 1, location.y);
+                    const left_index = self.getIndex(left.x, left.y);
+                    if (!self.cells.items[left_index].east) {
+                        return left;
+                    }
+                }
+            },
+            .North => {
+                if (location.y > 0) {
+                    const up: math.Vec2(usize) = .init(location.x, location.y - 1);
+                    const up_index = self.getIndex(up.x, up.y);
+                    if (!self.cells.items[up_index].south) {
+                        return up;
+                    }
+                }
+            },
+        }
     }
 
     pub fn getNeighbours(self: *@This(), location: math.Vec2(usize)) [4]?math.Vec2(usize) {
         var result: [4]?math.Vec2(usize) = .{ null, null, null, null };
-        const index = self.getIndex(location.x, location.y);
-        const cell = self.cells.items[index];
-
-        if (!cell.east) {
-            result[0] = .init(location.x + 1, location.y);
-        }
-
-        if (!cell.south) {
-            result[1] = .init(location.x, location.y + 1);
-        }
-
-        if (location.x > 0) {
-            const left: math.Vec2(usize) = .init(location.x - 1, location.y);
-            const left_index = self.getIndex(left.x, left.y);
-            if (!self.cells.items[left_index].east) {
-                result[2] = left;
-            }
-        }
-
-        if (location.y > 0) {
-            const up: math.Vec2(usize) = .init(location.x, location.y - 1);
-            const up_index = self.getIndex(up.x, up.y);
-            if (!self.cells.items[up_index].south) {
-                result[3] = up;
-            }
-        }
-
+        result[0] = self.getNeighboutInDirection(location, .East);
+        result[1] = self.getNeighboutInDirection(location, .South);
+        result[2] = self.getNeighboutInDirection(location, .West);
+        result[3] = self.getNeighboutInDirection(location, .North);
         return result;
     }
 
@@ -125,16 +139,17 @@ pub const LimitedMaze = struct {
     ) !void {
         var location: math.Vec2(usize) = dir_location orelse return;
         while (true) {
+            // TODO: Invalidation code
             const neighbours = environment.getNeighbours(location);
 
             const index = self.getIndex(location.x, location.y);
-            self.cells.items[index] = environment.cells.items[index];
-            self.cells.items[index].path = false;
-            self.cells.items[index].corner = false;
+            self.cells[index] = environment.cells[index];
+            self.cells[index].path = false;
+            self.cells[index].corner = false;
 
             if (getUnexplored(direction, neighbours)) |unexplored| {
-                try self.folks.put(location, unexplored);
-                self.cells.items[index].path = true;
+                try self.folks.put(self.allocator, location, unexplored);
+                self.cells[index].path = true;
             }
 
             if (neighbours[@intFromEnum(direction)]) |new| {
@@ -151,16 +166,15 @@ pub const LimitedMaze = struct {
         current_location: math.Vec2(usize),
     ) !void {
         const neighbours = environment.getNeighbours(current_location);
-        // TODO: Custom logic if the current location is a folk
 
         try self.increaseVisibilityInDirection(
             environment,
-            neighbours[0],
+            current_location,
             .East,
         );
         try self.increaseVisibilityInDirection(
             environment,
-            neighbours[1],
+            current_location,
             .South,
         );
         try self.increaseVisibilityInDirection(
