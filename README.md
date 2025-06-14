@@ -4,7 +4,7 @@
 
 - [x] Remove energy system
 - [x] Environmental Memory and limited visibility
-- [ ] Doors and Levers
+- [x] Doors and Levers
 - [ ] Dynamic maze shifting
 - [ ] Environmental Invalidation
 - [ ] Explore routine
