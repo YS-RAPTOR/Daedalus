@@ -46,13 +46,40 @@ pub const LimitedMaze = struct {
         self.levers_found.deinit(self.allocator);
     }
 
+    pub inline fn getCellInDirection(
+        location: math.Vec2(usize),
+        direction: Direction,
+    ) ?math.Vec2(usize) {
+        switch (direction) {
+            .East => {
+                return location;
+            },
+            .South => {
+                return location;
+            },
+            .West => {
+                if (location.x > 0) {
+                    const left: math.Vec2(usize) = .init(location.x - 1, location.y);
+                    return left;
+                }
+            },
+            .North => {
+                if (location.y > 0) {
+                    const up: math.Vec2(usize) = .init(location.x, location.y - 1);
+                    return up;
+                }
+            },
+        }
+        return null;
+    }
+
     pub inline fn getNeighboutInDirection(
         self: *@This(),
         location: math.Vec2(usize),
         direction: Direction,
     ) ?math.Vec2(usize) {
         const index = self.getIndex(location.x, location.y);
-        const cell = self.cells.items[index];
+        const cell = self.cells[index];
         switch (direction) {
             .East => {
                 if (!cell.east) return .init(location.x + 1, location.y);
@@ -64,7 +91,7 @@ pub const LimitedMaze = struct {
                 if (location.x > 0) {
                     const left: math.Vec2(usize) = .init(location.x - 1, location.y);
                     const left_index = self.getIndex(left.x, left.y);
-                    if (!self.cells.items[left_index].east) {
+                    if (!self.cells[left_index].east) {
                         return left;
                     }
                 }
@@ -73,12 +100,13 @@ pub const LimitedMaze = struct {
                 if (location.y > 0) {
                     const up: math.Vec2(usize) = .init(location.x, location.y - 1);
                     const up_index = self.getIndex(up.x, up.y);
-                    if (!self.cells.items[up_index].south) {
+                    if (!self.cells[up_index].south) {
                         return up;
                     }
                 }
             },
         }
+        return null;
     }
 
     pub fn getNeighbours(self: *@This(), location: math.Vec2(usize)) [4]?math.Vec2(usize) {
@@ -147,22 +175,40 @@ pub const LimitedMaze = struct {
         var location: math.Vec2(usize) = dir_location orelse return false;
         var should_replan = false;
         while (true) {
-            // TODO: Invalidation code
+            // NOTE: Replan triggered in these conditions:
+            //      Door state changes from previously explored state.
+            //      Found a lever.
+            //      Found a door.
+
             const neighbours = environment.getNeighbours(location);
 
             const index = self.getIndex(location.x, location.y);
+
+            if (self.cells[index].explored) {
+                if (self.cells[index].south != environment.cells[index].south or
+                    self.cells[index].east != environment.cells[index].east)
+                {
+                    should_replan = true;
+                }
+            }
+
             self.cells[index] = environment.cells[index];
             self.cells[index].path = false;
             self.cells[index].corner = false;
+            self.cells[index].explored = true;
 
             if (self.cells[index].lever) {
-                try self.levers_found.put(self.allocator, location, {});
-                should_replan = true;
+                if (!self.levers_found.contains(location)) {
+                    try self.levers_found.put(self.allocator, location, {});
+                    should_replan = true;
+                }
             }
-            // TODO: Has error when finding closed doors when facing north and west
+
             if (self.cells[index].south_door or self.cells[index].east_door) {
-                try self.doors_found.put(self.allocator, location, {});
-                should_replan = true;
+                if (!self.doors_found.contains(location)) {
+                    try self.doors_found.put(self.allocator, location, {});
+                    should_replan = true;
+                }
             }
 
             if (getUnexplored(direction, neighbours)) |unexplored| {
@@ -173,6 +219,50 @@ pub const LimitedMaze = struct {
             if (neighbours[@intFromEnum(direction)]) |new| {
                 location = new;
             } else {
+                if (direction == .North) {
+                    const up = getCellInDirection(
+                        location,
+                        .North,
+                    ) orelse break;
+                    const up_index = self.getIndex(up.x, up.y);
+
+                    if (self.cells[up_index].explored) {
+                        if (self.cells[up_index].south != environment.cells[up_index].south) {
+                            should_replan = true;
+                        }
+                    }
+                    self.cells[up_index].south = environment.cells[up_index].south;
+                    self.cells[up_index].south_door = environment.cells[up_index].south_door;
+
+                    if (self.cells[up_index].south_door) {
+                        if (!self.doors_found.contains(up)) {
+                            try self.doors_found.put(self.allocator, up, {});
+                            should_replan = true;
+                        }
+                    }
+                } else if (direction == .West) {
+                    const left = getCellInDirection(
+                        location,
+                        .West,
+                    ) orelse break;
+                    const left_index = self.getIndex(left.x, left.y);
+
+                    if (self.cells[left_index].explored) {
+                        if (self.cells[left_index].east != environment.cells[left_index].east) {
+                            should_replan = true;
+                        }
+                    }
+
+                    self.cells[left_index].east = environment.cells[left_index].east;
+                    self.cells[left_index].east_door = environment.cells[left_index].east_door;
+
+                    if (self.cells[left_index].east_door) {
+                        if (!self.doors_found.contains(left)) {
+                            try self.doors_found.put(self.allocator, left, {});
+                            should_replan = true;
+                        }
+                    }
+                }
                 break;
             }
         }

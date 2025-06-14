@@ -6,7 +6,7 @@
 - [x] Environmental Memory and limited visibility
 - [x] Doors and Levers
 - [x] Dynamic maze shifting
-- [ ] Environmental Invalidation
+- [x] Environmental Change Detection
 - [ ] Explore routine
 - [ ] GOAP
 - [ ] Behavior Trees

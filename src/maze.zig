@@ -11,7 +11,7 @@ pub const Cell = packed struct(u8) {
     east_door: bool,
     path: bool,
     corner: bool,
-    padding: u1,
+    explored: bool,
 
     pub const Open: @This() = .{
         .south = false,
@@ -21,7 +21,7 @@ pub const Cell = packed struct(u8) {
         .east_door = false,
         .path = false,
         .corner = false,
-        .padding = 0,
+        .explored = false,
     };
 
     pub const Walled: @This() = .{
@@ -32,7 +32,7 @@ pub const Cell = packed struct(u8) {
         .east_door = false,
         .path = false,
         .corner = false,
-        .padding = 0,
+        .explored = false,
     };
 };
 
@@ -71,11 +71,11 @@ pub const Maze = struct {
     pub fn randomizeDoors(self: *@This()) void {
         for (self.randomizable_doors.items) |door_index| {
             // Random chance to open the door
-            const open = self.rng.random().boolean();
+            const closed = self.rng.random().boolean();
             if (self.cells[door_index].south_door) {
-                self.cells[door_index].south = open;
+                self.cells[door_index].south = closed;
             } else if (self.cells[door_index].east_door) {
-                self.cells[door_index].east = open;
+                self.cells[door_index].east = closed;
             } else {
                 unreachable; // Should not happen
             }

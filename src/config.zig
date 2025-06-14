@@ -9,10 +9,10 @@ const Config = struct {
     max_entities: u32 = 100,
 
     // Maze Generation
-    seed: u64 = 0,
+    seed: u64 = 1,
     maze_size: u32 = 25,
     no_of_doors: u32 = 10,
-    permutation_time_period: f32 = 10,
+    permutation_time_period: f32 = 5,
     door_coverage_percentage: f32 = 0.15,
 
     // Render
