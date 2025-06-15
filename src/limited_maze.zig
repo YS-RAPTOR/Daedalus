@@ -21,6 +21,10 @@ pub const LimitedMaze = struct {
 
     doors_found: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), void),
     levers_found: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), void),
+
+    doors_to_levers: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), math.Vec2(usize)),
+    levers_to_doors: std.AutoArrayHashMapUnmanaged(math.Vec2(usize), math.Vec2(usize)),
+
     allocator: std.mem.Allocator,
 
     pub fn getIndex(self: *@This(), x: usize, y: usize) usize {
@@ -32,18 +36,32 @@ pub const LimitedMaze = struct {
         environment: *maze.Maze,
         target: math.Vec2(usize),
     ) !@This() {
-        const self: @This() = .{
+        var self: @This() = .{
             .cells = try allocator.alloc(Cell, environment.size.x * environment.size.y),
             .unexplored = .empty,
             .explored = .empty,
             .size = environment.size,
             .doors_found = .empty,
             .levers_found = .empty,
+            .doors_to_levers = try environment.doors_to_levers.clone(allocator),
+            .levers_to_doors = try environment.levers_to_doors.clone(allocator),
             .allocator = allocator,
             .target = target,
         };
+        if (config.has_snapshot_at_start) {
+            @memcpy(self.cells, environment.cells);
 
-        @memset(self.cells, .Walled);
+            for (self.doors_to_levers.keys()) |door| {
+                try self.doors_found.put(self.allocator, door, {});
+            }
+
+            for (self.levers_to_doors.keys()) |lever| {
+                try self.levers_found.put(self.allocator, lever, {});
+            }
+        } else {
+            @memset(self.cells, .Walled);
+        }
+
         return self;
     }
 
@@ -53,6 +71,8 @@ pub const LimitedMaze = struct {
         self.explored.deinit(self.allocator);
         self.doors_found.deinit(self.allocator);
         self.levers_found.deinit(self.allocator);
+        self.doors_to_levers.deinit(self.allocator);
+        self.levers_to_doors.deinit(self.allocator);
     }
 
     pub inline fn getCellInDirection(
@@ -362,8 +382,8 @@ pub const LimitedMaze = struct {
             .cells = self.cells,
             .size = self.size,
             .rng = undefined,
-            .doors_to_levers = .empty,
-            .levers_to_doors = .empty,
+            .doors_to_levers = self.doors_to_levers,
+            .levers_to_doors = self.levers_to_doors,
             .randomizable_doors = .empty,
             .duration = 0,
         };

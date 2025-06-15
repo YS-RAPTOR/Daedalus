@@ -33,6 +33,7 @@ const Config = struct {
 
     // Planner
     planner: enum(u1) { GOAP, BehaviorTree } = .BehaviorTree,
+    has_snapshot_at_start: bool = true,
 };
 
 pub const config: Config = .{};
