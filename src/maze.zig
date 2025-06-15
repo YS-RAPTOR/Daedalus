@@ -395,7 +395,7 @@ pub const Maze = struct {
             std.debug.print("\n|", .{});
             for (0..self.size.x) |col| {
                 const index = self.getIndex(col, row);
-                if (self.cells.items[index].east) {
+                if (self.cells[index].east) {
                     std.debug.print("   |", .{});
                 } else {
                     std.debug.print("    ", .{});
@@ -404,7 +404,7 @@ pub const Maze = struct {
             std.debug.print("\n+", .{});
             for (0..self.size.x) |col| {
                 const index = self.getIndex(col, row);
-                if (self.cells.items[index].south) {
+                if (self.cells[index].south) {
                     std.debug.print("---+", .{});
                 } else {
                     std.debug.print("   +", .{});

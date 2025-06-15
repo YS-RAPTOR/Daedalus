@@ -58,11 +58,32 @@ pub const LimitedMaze = struct {
             for (self.levers_to_doors.keys()) |lever| {
                 try self.levers_found.put(self.allocator, lever, {});
             }
+
+            for (0..self.cells.len) |i| {
+                self.cells[i].explored = true;
+            }
         } else {
             @memset(self.cells, .Walled);
         }
 
         return self;
+    }
+
+    pub fn cloneForPlanner(self: *@This(), allocator: std.mem.Allocator) !@This() {
+        const s: @This() = .{
+            .cells = try allocator.alloc(Cell, self.size.x * self.size.y),
+            .size = self.size,
+            .unexplored = .empty,
+            .explored = .empty,
+            .doors_found = self.doors_found,
+            .levers_found = self.levers_found,
+            .doors_to_levers = self.doors_to_levers,
+            .levers_to_doors = self.levers_to_doors,
+            .allocator = allocator,
+            .target = self.target,
+        };
+        @memcpy(s.cells, self.cells);
+        return s;
     }
 
     pub fn deinit(self: *@This()) void {
@@ -342,6 +363,26 @@ pub const LimitedMaze = struct {
         return should_replan;
     }
 
+    pub fn flipLeverForPlanning(self: *@This(), location: math.Vec2(usize)) bool {
+        if (!self.levers_to_doors.contains(location)) {
+            return false;
+        }
+
+        const door_location = self.levers_to_doors.get(location) orelse unreachable;
+        if (self.doors_found.contains(door_location)) {
+            const door_index = self.getIndex(door_location.x, door_location.y);
+            if (self.cells[door_index].south_door) {
+                self.cells[door_index].south = false;
+                self.cells[door_index].south_door = false;
+            } else if (self.cells[door_index].east_door) {
+                self.cells[door_index].east = false;
+                self.cells[door_index].east_door = false;
+            }
+        }
+        self.cells[self.getIndex(location.x, location.y)].lever = false;
+        return true;
+    }
+
     pub fn flipLever(self: *@This(), environment: *maze.Maze, location: math.Vec2(usize)) !bool {
         if (!environment.flipLever(location)) {
             return false;
@@ -377,15 +418,76 @@ pub const LimitedMaze = struct {
         try self.explored.put(self.allocator, explored.key, {});
     }
 
-    pub inline fn convert(self: *@This()) maze.Maze {
-        return .{
-            .cells = self.cells,
-            .size = self.size,
-            .rng = undefined,
-            .doors_to_levers = self.doors_to_levers,
-            .levers_to_doors = self.levers_to_doors,
-            .randomizable_doors = .empty,
-            .duration = 0,
+    pub fn movementCost(
+        self: *@This(),
+        current_location: math.Vec2(usize),
+        target_location: math.Vec2(usize),
+    ) usize {
+        const direction: Direction = blk: {
+            if (target_location.x > current_location.x and target_location.y == current_location.y) {
+                break :blk .East;
+            } else if (target_location.y > current_location.y and target_location.x == current_location.x) {
+                break :blk .South;
+            } else if (target_location.x < current_location.x and target_location.y == current_location.y) {
+                break :blk .West;
+            } else if (target_location.y < current_location.y and target_location.x == current_location.x) {
+                break :blk .North;
+            } else {
+                unreachable;
+            }
         };
+
+        const current_index = self.getIndex(current_location.x, current_location.y);
+        const target_index = self.getIndex(target_location.x, target_location.y);
+        switch (direction) {
+            .East => {
+                if (self.cells[current_index].east_door) {
+                    return config.door_movement_cost;
+                } else return 1;
+            },
+            .South => {
+                if (self.cells[current_index].south_door) {
+                    return config.door_movement_cost;
+                } else return 1;
+            },
+            .West => {
+                if (self.cells[target_index].east_door) {
+                    return config.door_movement_cost;
+                } else return 1;
+            },
+            .North => {
+                if (self.cells[target_index].south_door) {
+                    return config.door_movement_cost;
+                } else return 1;
+            },
+        }
+    }
+
+    pub fn print(self: *@This()) void {
+        std.debug.print("+", .{});
+        for (0..self.size.x) |_| {
+            std.debug.print("---+", .{});
+        }
+
+        for (0..self.size.y) |row| {
+            std.debug.print("\n|", .{});
+            for (0..self.size.x) |col| {
+                const index = self.getIndex(col, row);
+                if (self.cells[index].east) {
+                    std.debug.print("   |", .{});
+                } else {
+                    std.debug.print("    ", .{});
+                }
+            }
+            std.debug.print("\n+", .{});
+            for (0..self.size.x) |col| {
+                const index = self.getIndex(col, row);
+                if (self.cells[index].south) {
+                    std.debug.print("---+", .{});
+                } else {
+                    std.debug.print("   +", .{});
+                }
+            }
+        }
     }
 };

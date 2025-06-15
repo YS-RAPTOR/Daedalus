@@ -143,6 +143,7 @@ pub const AI = struct {
 
         // Check if we need to replan
         if (self.current_action == null or should_replan) {
+            std.debug.print("Replanning...\n", .{});
             try planner.plan(
                 self.environment.allocator,
                 &self.environment,
@@ -150,20 +151,25 @@ pub const AI = struct {
                 self.target_cell,
                 &self.actions,
             );
+
             self.corners.clearRetainingCapacity();
             self.current_corner = 0;
             self.sub_target = null;
             self.current_action = self.actions.pop();
         }
+        if (self.target_cell.equals(self.cell_position)) {
+            self.win = true;
+            return;
+        }
+
         // Perform Action
-        var converted_environment = self.environment.convert();
         switch (self.current_action.?) {
             .GoToTarget => |target| {
                 if (self.sub_target == null) {
                     self.sub_target = target.cast(f32).add(.init(0.5, 0.5));
-                    var path_to_target = try path.aStar(
+                    var path_to_target, _ = try path.aStar(
                         self.environment.allocator,
-                        &converted_environment,
+                        &self.environment,
                         self.cell_position,
                         target,
                         null,
@@ -182,23 +188,23 @@ pub const AI = struct {
             .Explore => {
                 if (self.sub_target == null) {
                     var target = self.cell_position;
-                    var steps: usize = 10_000_000;
+                    var target_cost: usize = 10_000_000;
                     var p: std.ArrayListUnmanaged(math.Vec2(usize)) = .empty;
                     defer p.deinit(self.environment.allocator);
 
                     for (self.environment.unexplored.keys()) |unexplored_cell| {
-                        var path_to_unexplored = path.aStar(
+                        var path_to_unexplored, const cost = path.aStar(
                             self.environment.allocator,
-                            &converted_environment,
+                            &self.environment,
                             self.cell_position,
                             unexplored_cell,
                             null,
                         ) catch continue;
 
-                        if (path_to_unexplored.items.len < steps) {
+                        if (cost < target_cost) {
                             p.deinit(self.environment.allocator);
                             target = unexplored_cell;
-                            steps = path_to_unexplored.items.len;
+                            target_cost = cost;
                             p = path_to_unexplored;
                         } else {
                             path_to_unexplored.deinit(self.environment.allocator);
@@ -257,10 +263,6 @@ pub const AI = struct {
             self.velocity.multiply(delta_time),
         );
         self.force = .Zero;
-
-        if (self.target.subtract(self.position).trueLength() < config.corner_reached_distance) {
-            self.win = true;
-        }
     }
 
     pub fn submitEntities(self: *@This(), entities: []Entity, offset: usize, cell_size: f32) usize {

@@ -32,8 +32,9 @@ const Config = struct {
     slow_down_speed: f32 = 0.5,
 
     // Planner
-    planner: enum(u1) { GOAP, BehaviorTree } = .BehaviorTree,
-    has_snapshot_at_start: bool = true,
+    planner: enum(u1) { GOAP, BehaviorTree } = .GOAP,
+    has_snapshot_at_start: bool = false,
+    door_movement_cost: usize = 1,
 };
 
 pub const config: Config = .{};

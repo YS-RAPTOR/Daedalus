@@ -1,6 +1,6 @@
 const std = @import("std");
 const math = @import("math.zig");
-const maze = @import("maze.zig");
+const maze = @import("limited_maze.zig");
 
 const AStarElem = struct {
     value: usize,
@@ -51,11 +51,11 @@ pub fn heuristic(a: math.Vec2(usize), b: math.Vec2(usize)) usize {
 
 pub fn aStar(
     allocator: std.mem.Allocator,
-    environment: *maze.Maze,
+    environment: *maze.LimitedMaze,
     start: math.Vec2(usize),
     target: math.Vec2(usize),
     max_cost: ?usize,
-) !std.ArrayListUnmanaged(math.Vec2(usize)) {
+) !struct { std.ArrayListUnmanaged(math.Vec2(usize)), usize } {
     var arena = std.heap.ArenaAllocator.init(allocator);
     const arena_allocator = arena.allocator();
     defer arena.deinit();
@@ -71,6 +71,7 @@ pub fn aStar(
 
     while (open.removeOrNull()) |e| {
         try closed.put(arena_allocator, e.location, {});
+        const cost = e.value - heuristic(e.location, target);
         if (e.location.equals(target)) {
             var path: std.ArrayListUnmanaged(math.Vec2(usize)) = .empty;
             var current = e.location;
@@ -79,10 +80,9 @@ pub fn aStar(
                 try path.append(allocator, current);
                 current = route.get(current).?;
             }
-            return path;
+            return .{ path, cost };
         }
 
-        const cost = e.value - heuristic(e.location, target);
         if (max_cost) |mc| {
             if (cost > mc) {
                 continue;
@@ -95,7 +95,10 @@ pub fn aStar(
             const neighbour = null_neighbour.?;
             if (closed.contains(neighbour)) continue;
 
-            const cost_g = cost + 1;
+            const cost_g = cost + environment.movementCost(
+                e.location,
+                neighbour,
+            );
             const cost_h = heuristic(neighbour, target);
             const total_cost = cost_g + cost_h;
 
