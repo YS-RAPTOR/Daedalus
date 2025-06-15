@@ -335,7 +335,6 @@ pub const LimitedMaze = struct {
         environment: *maze.Maze,
         current_location: math.Vec2(usize),
     ) !bool {
-        const neighbours = environment.getNeighbours(current_location);
         var should_replan: bool = false;
 
         if (try self.increaseVisibilityInDirection(
@@ -351,13 +350,13 @@ pub const LimitedMaze = struct {
 
         if (try self.increaseVisibilityInDirection(
             environment,
-            neighbours[2],
+            current_location,
             .West,
         )) should_replan = true;
 
         if (try self.increaseVisibilityInDirection(
             environment,
-            neighbours[3],
+            current_location,
             .North,
         )) should_replan = true;
 
