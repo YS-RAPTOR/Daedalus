@@ -70,7 +70,6 @@ pub fn plan(
                     defer path_to_target.?.deinit(allocator);
                     try actions.append(allocator, .{ .GoToTarget = target_location });
 
-                    std.debug.print("Pathing to target\n", .{});
                     return;
                 }
             }
@@ -97,14 +96,12 @@ pub fn plan(
                 if (lever_location) |lever| {
                     try actions.append(allocator, .{ .GoToTarget = lever });
 
-                    std.debug.print("Pathing to lever at {any}\n", .{lever});
                     return;
                 }
             }
 
             // Explore normally
             try actions.append(allocator, .{ .Explore = {} });
-            std.debug.print("Exploring normally\n", .{});
             return;
         },
     }

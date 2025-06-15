@@ -147,7 +147,6 @@ pub const AI = struct {
 
         // Check if we need to replan
         if (self.current_action == null or should_replan) {
-            std.debug.print("Replanning...\n", .{});
             try planner.plan(
                 self.environment.allocator,
                 &self.environment,
