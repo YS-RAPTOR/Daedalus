@@ -122,7 +122,11 @@ pub const AI = struct {
         if (self.current_action) |current_action| {
             switch (current_action) {
                 .GoToTarget => |target| {
-                    if (self.cell_position.equals(target)) {
+                    if (self.position.subtract(
+                        target
+                            .cast(f32)
+                            .add(.init(0.5, 0.5)),
+                    ).trueLength() < config.corner_reached_distance) {
                         self.current_action = self.actions.pop();
                         self.corners.clearRetainingCapacity();
                         self.current_corner = 0;
@@ -131,7 +135,7 @@ pub const AI = struct {
                 },
                 .Explore => {
                     if (self.sub_target) |sub_target| {
-                        if (self.cell_position.equals(sub_target.floor().cast(usize))) {
+                        if (self.position.subtract(sub_target).trueLength() < config.corner_reached_distance) {
                             self.corners.clearRetainingCapacity();
                             self.current_corner = 0;
                             self.sub_target = null;
@@ -157,9 +161,9 @@ pub const AI = struct {
             self.sub_target = null;
             self.current_action = self.actions.pop();
         }
-        if (self.target_cell.equals(self.cell_position)) {
+
+        if (self.cell_position.equals(self.target_cell)) {
             self.win = true;
-            return;
         }
 
         // Perform Action
