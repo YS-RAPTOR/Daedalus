@@ -11,6 +11,7 @@
 - [x] Behavior Trees
 - [x] Full maze snapshot
 - [x] GOAP
+- [x] Add planning time and solving time measurement collection
 
 ## Optional
 

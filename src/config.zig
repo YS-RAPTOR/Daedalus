@@ -10,7 +10,7 @@ const Config = struct {
 
     // Maze Generation
     seed: u64 = 0,
-    maze_size: u32 = 25,
+    maze_size: u32 = 30,
     no_of_doors: u32 = 10,
     permutation_time_period: f32 = 5,
     door_coverage_percentage: f32 = 0.15,
@@ -37,4 +37,14 @@ const Config = struct {
     door_movement_cost: usize = 1,
 };
 
-pub const config: Config = .{};
+const normal: Config = .{};
+
+const double_size: Config = .{
+    .maze_size = 60,
+};
+
+const double_doors: Config = .{
+    .no_of_doors = 20,
+};
+
+pub const config: Config = normal;

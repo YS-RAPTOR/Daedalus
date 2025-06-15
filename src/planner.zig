@@ -4,6 +4,7 @@ const LimitedMaze = @import("limited_maze.zig").LimitedMaze;
 const Cell = @import("maze.zig").Cell;
 const config = @import("config.zig").config;
 const path = @import("path.zig");
+const Timer = @import("debug.zig").Timer;
 
 pub const Action = union(enum) {
     GoToTarget: math.Vec2(usize),
@@ -17,6 +18,8 @@ pub fn plan(
     target_location: math.Vec2(usize),
     actions: *std.ArrayListUnmanaged(Action),
 ) !void {
+    var timer: Timer = .start();
+    defer timer.timestamp("Planning Completed");
     actions.clearRetainingCapacity();
     switch (config.planner) {
         .GOAP => {
