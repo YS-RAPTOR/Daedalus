@@ -210,7 +210,7 @@ const Goal = enum { ReachTarget, FlickLever };
 fn hasReachedGoal(state: *GOAPState, goal: Goal) bool {
     switch (goal) {
         .ReachTarget => return state.location.equals(state.environment.target),
-        .FlickLever => return state.levers_flicked >= state.environment.levers_found.count(),
+        .FlickLever => return state.levers_flicked > 1,
     }
 }
 

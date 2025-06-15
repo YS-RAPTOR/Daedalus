@@ -336,7 +336,6 @@ pub const LimitedMaze = struct {
         current_location: math.Vec2(usize),
     ) !bool {
         const neighbours = environment.getNeighbours(current_location);
-        const current_enexplored_count = self.unexplored.count();
         var should_replan: bool = false;
 
         if (try self.increaseVisibilityInDirection(
@@ -361,10 +360,6 @@ pub const LimitedMaze = struct {
             neighbours[3],
             .North,
         )) should_replan = true;
-
-        if (config.has_snapshot_at_start and self.unexplored.count() > current_enexplored_count) {
-            should_replan = true;
-        }
 
         return should_replan;
     }
