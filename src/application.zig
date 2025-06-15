@@ -275,18 +275,18 @@ pub const Application = struct {
 
     fn handleKeyboardInput(self: *@This(), keycode: u32) void {
         switch (keycode) {
-            sdl.SDLK_W, sdl.SDLK_UP => {
-                self.game_data.ai_player.force.y = -10.0;
-            },
-            sdl.SDLK_S, sdl.SDLK_DOWN => {
-                self.game_data.ai_player.force.y = 10.0;
-            },
-            sdl.SDLK_A, sdl.SDLK_LEFT => {
-                self.game_data.ai_player.force.x = -10.0;
-            },
-            sdl.SDLK_D, sdl.SDLK_RIGHT => {
-                self.game_data.ai_player.force.x = 10.0;
-            },
+            // sdl.SDLK_W, sdl.SDLK_UP => {
+            //     self.game_data.ai_player.force.y = -10.0;
+            // },
+            // sdl.SDLK_S, sdl.SDLK_DOWN => {
+            //     self.game_data.ai_player.force.y = 10.0;
+            // },
+            // sdl.SDLK_A, sdl.SDLK_LEFT => {
+            //     self.game_data.ai_player.force.x = -10.0;
+            // },
+            // sdl.SDLK_D, sdl.SDLK_RIGHT => {
+            //     self.game_data.ai_player.force.x = 10.0;
+            // },
             sdl.SDLK_SPACE => {
                 // Toggle pause state
                 self.game_data.paused = !self.game_data.paused;
@@ -295,10 +295,10 @@ pub const Application = struct {
                 // Toggle limited visibility
                 self.game_data.limited_visibility = !self.game_data.limited_visibility;
             },
-            sdl.SDLK_E => {
-                // Flick lever
-                _ = self.maze.flipLever(self.game_data.ai_player.cell_position);
-            },
+            // sdl.SDLK_E => {
+            //     // Flick lever
+            //     _ = self.maze.flipLever(self.game_data.ai_player.cell_position);
+            // },
             else => {},
         }
     }
