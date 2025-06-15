@@ -84,7 +84,7 @@ pub const AI = struct {
                 distance_to_corner / config.corner_lerp_distance,
             );
         } else if (distance_to_corner < config.slow_down_distance and speed > config.slow_down_speed) {
-            self.force = direction.multiply(-1);
+            self.force = direction.multiply((config.slow_down_speed - speed) / distance_to_corner);
         } else {
             self.force = direction;
         }
