@@ -9,8 +9,8 @@
 - [x] Environmental Change Detection
 - [x] Explore routine
 - [x] Behavior Trees
-- [ ] Full maze snapshot
-- [ ] GOAP
+- [x] Full maze snapshot
+- [x] GOAP
 
 ## Optional
 
