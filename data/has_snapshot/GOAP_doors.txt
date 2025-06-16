@@ -1,0 +1,28 @@
+Planner: config.Config__enum_24173.GOAP, has snapshot: true, Maze Size: 25, No of Doors: 20
+Timestamp: Planning Completed, Elapsed: 1273561 ns
+Timestamp: Planning Completed, Elapsed: 986018 ns
+Timestamp: Planning Completed, Elapsed: 952590 ns
+Timestamp: Planning Completed, Elapsed: 720416 ns
+Timestamp: Planning Completed, Elapsed: 598825 ns
+Timestamp: Planning Completed, Elapsed: 439846 ns
+Timestamp: Planning Completed, Elapsed: 593602 ns
+Timestamp: Planning Completed, Elapsed: 416122 ns
+Timestamp: Planning Completed, Elapsed: 405396 ns
+Timestamp: Planning Completed, Elapsed: 335992 ns
+Timestamp: Planning Completed, Elapsed: 510867 ns
+Timestamp: Planning Completed, Elapsed: 351160 ns
+Timestamp: Planning Completed, Elapsed: 543604 ns
+Timestamp: Planning Completed, Elapsed: 358248 ns
+Timestamp: Planning Completed, Elapsed: 247566 ns
+Timestamp: Planning Completed, Elapsed: 171499 ns
+Timestamp: Planning Completed, Elapsed: 91596 ns
+Timestamp: Planning Completed, Elapsed: 7090 ns
+Timestamp: Planning Completed, Elapsed: 108180 ns
+Timestamp: Planning Completed, Elapsed: 3876 ns
+Timestamp: Planning Completed, Elapsed: 7110 ns
+Timestamp: Planning Completed, Elapsed: 10128 ns
+Timestamp: Planning Completed, Elapsed: 7677 ns
+Timestamp: Planning Completed, Elapsed: 7588 ns
+Timestamp: Planning Completed, Elapsed: 9349 ns
+AI Player won! Exiting...
+Timestamp: Maze Completed, Elapsed: 311049959 ns

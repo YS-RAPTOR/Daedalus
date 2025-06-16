@@ -1,0 +1,17 @@
+Planner: config.Config__enum_24173.GOAP, has snapshot: true, Maze Size: 50, No of Doors: 10
+Timestamp: Planning Completed, Elapsed: 320012 ns
+Timestamp: Planning Completed, Elapsed: 251464 ns
+Timestamp: Planning Completed, Elapsed: 206297 ns
+Timestamp: Planning Completed, Elapsed: 139111 ns
+Timestamp: Planning Completed, Elapsed: 244640 ns
+Timestamp: Planning Completed, Elapsed: 239241 ns
+Timestamp: Planning Completed, Elapsed: 108257 ns
+Timestamp: Planning Completed, Elapsed: 236719 ns
+Timestamp: Planning Completed, Elapsed: 176792 ns
+Timestamp: Planning Completed, Elapsed: 107272 ns
+Timestamp: Planning Completed, Elapsed: 62079 ns
+Timestamp: Planning Completed, Elapsed: 65329 ns
+Timestamp: Planning Completed, Elapsed: 51890 ns
+Timestamp: Planning Completed, Elapsed: 16259 ns
+AI Player won! Exiting...
+Timestamp: Maze Completed, Elapsed: 919217948 ns

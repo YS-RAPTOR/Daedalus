@@ -1,0 +1,30 @@
+Planner: config.Config__enum_24173.BehaviorTree, has snapshot: true, Maze Size: 25, No of Doors: 20
+Timestamp: Planning Completed, Elapsed: 7417 ns
+Timestamp: Planning Completed, Elapsed: 16707 ns
+Timestamp: Planning Completed, Elapsed: 15881 ns
+Timestamp: Planning Completed, Elapsed: 8702 ns
+Timestamp: Planning Completed, Elapsed: 12309 ns
+Timestamp: Planning Completed, Elapsed: 13223 ns
+Timestamp: Planning Completed, Elapsed: 11678 ns
+Timestamp: Planning Completed, Elapsed: 13602 ns
+Timestamp: Planning Completed, Elapsed: 13624 ns
+Timestamp: Planning Completed, Elapsed: 13191 ns
+Timestamp: Planning Completed, Elapsed: 16473 ns
+Timestamp: Planning Completed, Elapsed: 13378 ns
+Timestamp: Planning Completed, Elapsed: 12235 ns
+Timestamp: Planning Completed, Elapsed: 16863 ns
+Timestamp: Planning Completed, Elapsed: 15870 ns
+Timestamp: Planning Completed, Elapsed: 12449 ns
+Timestamp: Planning Completed, Elapsed: 16230 ns
+Timestamp: Planning Completed, Elapsed: 6728 ns
+Timestamp: Planning Completed, Elapsed: 11967 ns
+Timestamp: Planning Completed, Elapsed: 13979 ns
+Timestamp: Planning Completed, Elapsed: 11290 ns
+Timestamp: Planning Completed, Elapsed: 10428 ns
+Timestamp: Planning Completed, Elapsed: 7507 ns
+Timestamp: Planning Completed, Elapsed: 1349 ns
+Timestamp: Planning Completed, Elapsed: 1341 ns
+Timestamp: Planning Completed, Elapsed: 3117 ns
+Timestamp: Planning Completed, Elapsed: 1627 ns
+AI Player won! Exiting...
+Timestamp: Maze Completed, Elapsed: 226297087 ns

@@ -1,0 +1,12 @@
+Planner: config.Config__enum_24173.BehaviorTree, has snapshot: true, Maze Size: 25, No of Doors: 10
+Timestamp: Planning Completed, Elapsed: 4030 ns
+Timestamp: Planning Completed, Elapsed: 6879 ns
+Timestamp: Planning Completed, Elapsed: 10938 ns
+Timestamp: Planning Completed, Elapsed: 10224 ns
+Timestamp: Planning Completed, Elapsed: 6392 ns
+Timestamp: Planning Completed, Elapsed: 8457 ns
+Timestamp: Planning Completed, Elapsed: 5295 ns
+Timestamp: Planning Completed, Elapsed: 8041 ns
+Timestamp: Planning Completed, Elapsed: 2257 ns
+AI Player won! Exiting...
+Timestamp: Maze Completed, Elapsed: 183942098 ns
